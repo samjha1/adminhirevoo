@@ -25,7 +25,12 @@ class RoleMiddleware
         $allowed = array_map('trim', explode('|', $roleList));
 
         foreach ($allowed as $value) {
-            if ($admin->role === AdminRole::from($value)) {
+            $role = AdminRole::from($value);
+            if ($admin->role === $role) {
+                return $next($request);
+            }
+            // super_admin may access legacy admin-only routes
+            if ($value === 'admin' && $admin->role === AdminRole::SuperAdmin) {
                 return $next($request);
             }
         }

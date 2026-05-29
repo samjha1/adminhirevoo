@@ -1,0 +1,146 @@
+<?php
+
+namespace App\Services;
+
+use App\Enums\AdminRole;
+use App\Enums\AssignmentRoleLevel;
+use App\Enums\LeadAssignmentActionType;
+use App\Enums\LeadAssignmentStatus;
+use App\Enums\SalesTeam;
+use App\Models\Admin;
+use App\Modules\Leads\Models\CrmEmployerProspect;
+use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
+
+class EmployerProspectAssignmentService
+{
+    public function __construct(
+        private readonly SalesTeamService $teams,
+        private readonly AuditLogService $audit,
+    ) {
+    }
+
+    public function assignToSalesManager(CrmEmployerProspect $prospect, Admin $manager, Admin $actor): CrmEmployerProspect
+    {
+        $this->assertMarketingActor($actor);
+        $this->assertEmployerManager($manager);
+
+        return DB::transaction(function () use ($prospect, $manager, $actor) {
+            $prospect->assigned_to = $manager->id;
+            $prospect->assigned_by = $actor->id;
+            $prospect->sales_manager_id = $manager->id;
+            $prospect->assignment_role_level = AssignmentRoleLevel::Manager;
+            $prospect->assignment_status = LeadAssignmentStatus::Assigned;
+            $prospect->save();
+
+            $this->audit->log('employer.assign_manager', $actor, $prospect, ['manager_id' => $manager->id]);
+
+            return $prospect->fresh();
+        });
+    }
+
+    public function assignToEmployee(CrmEmployerProspect $prospect, Admin $employee, Admin $manager): CrmEmployerProspect
+    {
+        $this->assertEmployerManager($manager);
+        $this->assertEmployerEmployee($employee, $manager);
+
+        if ($prospect->sales_manager_id !== $manager->id && $prospect->assigned_to !== $manager->id) {
+            throw new InvalidArgumentException('Prospect is not owned by this manager.');
+        }
+
+        return DB::transaction(function () use ($prospect, $employee, $manager) {
+            $prospect->assigned_to = $employee->id;
+            $prospect->assigned_by = $manager->id;
+            $prospect->sales_manager_id = $manager->id;
+            $prospect->assignment_role_level = AssignmentRoleLevel::Employee;
+            $prospect->assignment_status = LeadAssignmentStatus::InProgress;
+            $prospect->save();
+
+            $this->audit->log('employer.assign_employee', $manager, $prospect, ['employee_id' => $employee->id]);
+
+            return $prospect->fresh();
+        });
+    }
+
+    /**
+     * @param  list<int>  $prospectIds
+     * @return array{success: int, skipped: int, errors: array<int, string>}
+     */
+    public function bulkAssignToManagers(array $prospectIds, Admin $manager, Admin $actor): array
+    {
+        $result = ['success' => 0, 'skipped' => 0, 'errors' => []];
+
+        foreach ($prospectIds as $id) {
+            try {
+                $prospect = CrmEmployerProspect::query()->findOrFail((int) $id);
+                if ($prospect->sales_manager_id === $manager->id) {
+                    $result['skipped']++;
+
+                    continue;
+                }
+                $this->assignToSalesManager($prospect, $manager, $actor);
+                $result['success']++;
+            } catch (\Throwable $e) {
+                $result['errors'][(int) $id] = $e->getMessage();
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param  list<int>  $prospectIds
+     * @return array{success: int, skipped: int, errors: array<int, string>}
+     */
+    public function bulkAssignToEmployees(array $prospectIds, Admin $employee, Admin $manager): array
+    {
+        $result = ['success' => 0, 'skipped' => 0, 'errors' => []];
+
+        foreach ($prospectIds as $id) {
+            try {
+                $prospect = CrmEmployerProspect::query()->findOrFail((int) $id);
+                if ($prospect->assigned_to === $employee->id) {
+                    $result['skipped']++;
+
+                    continue;
+                }
+                $this->assignToEmployee($prospect, $employee, $manager);
+                $result['success']++;
+            } catch (\Throwable $e) {
+                $result['errors'][(int) $id] = $e->getMessage();
+            }
+        }
+
+        return $result;
+    }
+
+    private function assertMarketingActor(Admin $actor): void
+    {
+        if (! $actor->role?->hasUnrestrictedLeadVisibility() && $actor->role !== AdminRole::Marketing) {
+            throw new InvalidArgumentException('Only marketing or admin can assign company prospects to managers.');
+        }
+    }
+
+    private function assertEmployerManager(Admin $manager): void
+    {
+        if ($manager->role !== AdminRole::SalesManager) {
+            throw new InvalidArgumentException('Target must be a company team sales manager.');
+        }
+        if ($this->teams->teamFor($manager) !== SalesTeam::Employer) {
+            throw new InvalidArgumentException('Manager must belong to the company (employer) sales team.');
+        }
+    }
+
+    private function assertEmployerEmployee(Admin $employee, Admin $manager): void
+    {
+        if ($employee->role !== AdminRole::SalesEmployee) {
+            throw new InvalidArgumentException('Target must be a company team sales executive.');
+        }
+        if ($this->teams->teamFor($employee) !== SalesTeam::Employer) {
+            throw new InvalidArgumentException('Employee must belong to the company (employer) sales team.');
+        }
+        if ((int) $employee->manager_id !== (int) $manager->id) {
+            throw new InvalidArgumentException('Employee must report to this manager.');
+        }
+    }
+}

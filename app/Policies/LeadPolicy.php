@@ -2,36 +2,44 @@
 
 namespace App\Policies;
 
-use App\Enums\AdminRole;
-use App\Enums\AssignmentRoleLevel;
 use App\Models\Admin;
 use App\Models\Hirevo\HirevoLead;
+use App\Modules\Rbac\Services\PermissionResolver;
 use App\Services\LeadVisibilityService;
 
 class LeadPolicy
 {
     public function __construct(
         private readonly LeadVisibilityService $visibility,
+        private readonly PermissionResolver $permissions,
     ) {
     }
 
     public function viewAny(Admin $admin): bool
     {
-        return true;
+        return $this->permissions->can($admin, 'leads.view');
     }
 
     public function view(Admin $admin, HirevoLead $lead): bool
     {
+        if (! $this->permissions->can($admin, 'leads.view')) {
+            return false;
+        }
+
+        if ($this->permissions->can($admin, 'leads.view_all')) {
+            return true;
+        }
+
         return $this->visibility->canViewLead($admin, $lead);
     }
 
     public function updateCrmStage(Admin $admin, HirevoLead $lead): bool
     {
-        if (! $this->view($admin, $lead)) {
+        if (! $this->permissions->can($admin, 'leads.update_stage') || ! $this->view($admin, $lead)) {
             return false;
         }
 
-        if ($admin->role === AdminRole::SalesEmployee) {
+        if ($admin->hasRole(\App\Enums\AdminRole::SalesEmployee)) {
             return $lead->assigned_to === $admin->id;
         }
 
@@ -40,19 +48,24 @@ class LeadPolicy
 
     public function updateSalesStatus(Admin $admin, HirevoLead $lead): bool
     {
-        if ($admin->hasRole(AdminRole::Admin)) {
-            return true;
+        if (! $this->permissions->can($admin, 'leads.update_sales_status')) {
+            return false;
         }
-        if ($admin->role === AdminRole::SalesEmployee && $lead->assigned_to === $admin->id) {
+
+        if ($this->permissions->can($admin, 'leads.view_all')) {
             return true;
         }
 
-        return false;
+        if ($admin->hasRole(\App\Enums\AdminRole::SalesEmployee) && $lead->assigned_to === $admin->id) {
+            return true;
+        }
+
+        return $this->view($admin, $lead);
     }
 
     public function assignAsMarketing(Admin $admin, HirevoLead $lead): bool
     {
-        if (! $admin->hasAnyRole([AdminRole::Admin, AdminRole::Marketing])) {
+        if (! $this->permissions->can($admin, 'leads.assign_manager')) {
             return false;
         }
 
@@ -61,7 +74,7 @@ class LeadPolicy
 
     public function assignAsManager(Admin $admin, HirevoLead $lead): bool
     {
-        if ($admin->role !== AdminRole::SalesManager) {
+        if (! $this->permissions->can($admin, 'leads.assign_employee')) {
             return false;
         }
 
@@ -70,17 +83,30 @@ class LeadPolicy
 
     public function takeBack(Admin $admin, HirevoLead $lead): bool
     {
-        if ($admin->role !== AdminRole::SalesManager) {
+        if (! $this->permissions->can($admin, 'leads.take_back')) {
             return false;
         }
 
         return $lead->sales_manager_id === $admin->id
-            && $lead->assignment_role_level === AssignmentRoleLevel::Employee;
+            && $lead->assignment_role_level === \App\Enums\AssignmentRoleLevel::Employee;
     }
 
     public function releaseToPool(Admin $admin, HirevoLead $lead): bool
     {
-        return $admin->hasAnyRole([AdminRole::Admin, AdminRole::Marketing])
-            && $this->view($admin, $lead);
+        if (! $this->permissions->can($admin, 'leads.release')) {
+            return false;
+        }
+
+        return $this->view($admin, $lead);
+    }
+
+    public function logCall(Admin $admin, HirevoLead $lead): bool
+    {
+        return $this->permissions->can($admin, 'leads.log_call') && $this->view($admin, $lead);
+    }
+
+    public function manageFollowups(Admin $admin, HirevoLead $lead): bool
+    {
+        return $this->permissions->can($admin, 'leads.manage_followups') && $this->view($admin, $lead);
     }
 }

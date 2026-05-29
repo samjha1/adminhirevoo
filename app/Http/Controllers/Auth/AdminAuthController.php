@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Support\AdminHomeResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -18,7 +19,8 @@ class AdminAuthController extends Controller
 
         if (Auth::guard('admin')->attempt($credentials, $request->boolean('remember'))) {
             $request->session()->regenerate();
-            return redirect()->intended(route('admin.dashboard'));
+
+            return redirect()->intended(AdminHomeResolver::urlFor(Auth::guard('admin')->user()));
         }
 
         return back()
@@ -35,4 +37,3 @@ class AdminAuthController extends Controller
         return redirect()->route('admin.login');
     }
 }
-

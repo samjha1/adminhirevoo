@@ -16,6 +16,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'admin.guard' => \App\Http\Middleware\SetAdminDefaultGuard::class,
             'role' => \App\Http\Middleware\RoleMiddleware::class,
+            'permission' => \App\Http\Middleware\CheckPermission::class,
+            'sales.pipeline' => \App\Http\Middleware\EnsureSalesTeamPipeline::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

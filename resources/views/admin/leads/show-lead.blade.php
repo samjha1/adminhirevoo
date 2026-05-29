@@ -422,7 +422,85 @@
             </section>
         @endcan
 
-        @if($me->hasAnyRole([\App\Enums\AdminRole::Admin, \App\Enums\AdminRole::Marketing]))
+        @can('logCall', $lead)
+            <section class="lead-section" aria-labelledby="sec-calls">
+                <div class="lead-section-hd">
+                    <div class="hd-icon crm"><i class="bi bi-telephone"></i></div>
+                    <div class="flex-grow-1">
+                        <h2 class="hd-title" id="sec-calls">Call activity</h2>
+                        <p class="hd-desc mb-0">Log outcomes and review recent calls.</p>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#logCallModal">Log call</button>
+                </div>
+                <div class="lead-section-bd">
+                    <ul class="list-group list-group-flush">
+                        @forelse($recentCalls as $call)
+                            <li class="list-group-item px-0 d-flex justify-content-between">
+                                <span>{{ $call->outcome->label() }} · {{ $call->admin?->name }}</span>
+                                <span class="text-muted small">{{ $call->called_at?->format('M j, H:i') }}</span>
+                            </li>
+                        @empty
+                            <li class="list-group-item px-0 text-muted">No calls logged yet.</li>
+                        @endforelse
+                    </ul>
+                </div>
+            </section>
+        @endcan
+
+        @can('manageFollowups', $lead)
+            <section class="lead-section" aria-labelledby="sec-followups">
+                <div class="lead-section-hd">
+                    <div class="hd-icon crm"><i class="bi bi-calendar-plus"></i></div>
+                    <div class="flex-grow-1">
+                        <h2 class="hd-title" id="sec-followups">Follow-ups</h2>
+                        <p class="hd-desc mb-0">Schedule the next touchpoint.</p>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#scheduleFollowUpModal">Schedule</button>
+                </div>
+                <div class="lead-section-bd">
+                    <ul class="list-group list-group-flush">
+                        @forelse($upcomingFollowUps as $fu)
+                            <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                                <span>{{ $fu->scheduled_at?->format('M j, Y H:i') }} · {{ $fu->status->label() }}</span>
+                                @if($fu->status->value === 'pending' || $fu->status->value === 'overdue')
+                                    <form method="POST" action="{{ route('admin.follow-ups.complete', $fu) }}" class="m-0">
+                                        @csrf
+                                        <button class="btn btn-sm btn-outline-success">Done</button>
+                                    </form>
+                                @endif
+                            </li>
+                        @empty
+                            <li class="list-group-item px-0 text-muted">No follow-ups scheduled.</li>
+                        @endforelse
+                    </ul>
+                </div>
+            </section>
+        @endcan
+
+        <section class="lead-section" aria-labelledby="sec-timeline">
+            <div class="lead-section-hd">
+                <div class="hd-icon history"><i class="bi bi-activity"></i></div>
+                <div>
+                    <h2 class="hd-title" id="sec-timeline">Activity timeline</h2>
+                    <p class="hd-desc mb-0">Calls, assignments, stages, and audit events.</p>
+                </div>
+            </div>
+            <div class="lead-section-bd">
+                <ul class="list-unstyled mb-0">
+                    @foreach($timeline->take(25) as $item)
+                        <li class="d-flex gap-3 mb-3 pb-3 border-bottom">
+                            <div class="text-muted small text-nowrap" style="min-width:120px">{{ $item['at']->format('M j, H:i') }}</div>
+                            <div>
+                                <div class="fw-semibold">{{ $item['title'] }}</div>
+                                <div class="text-muted small">{{ $item['type'] }}@if($item['actor']) · {{ $item['actor'] }}@endif</div>
+                            </div>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+        </section>
+
+        @if($me->canPermission('consultations.view'))
             <section class="lead-section" aria-labelledby="sec-consult">
                 <div class="lead-section-hd">
                     <div class="hd-icon contact"><i class="bi bi-calendar2-check"></i></div>
@@ -490,4 +568,68 @@
             </section>
         @endif
     </div>
+
+    @can('logCall', $lead)
+    <div class="modal fade" id="logCallModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <form method="POST" action="{{ route('admin.leads.calls.store', $lead) }}" class="modal-content">
+                @csrf
+                <div class="modal-header"><h5 class="modal-title">Log call</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body row g-3">
+                    <div class="col-12">
+                        <label class="form-label">Outcome</label>
+                        <select name="outcome" class="form-select" required>
+                            @foreach(\App\Modules\Leads\Enums\CallOutcome::cases() as $outcome)
+                                <option value="{{ $outcome->value }}">{{ $outcome->label() }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Duration (seconds)</label>
+                        <input type="number" name="duration_seconds" class="form-control" min="0">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Called at</label>
+                        <input type="datetime-local" name="called_at" class="form-control" value="{{ now()->format('Y-m-d\TH:i') }}">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Notes</label>
+                        <textarea name="notes" class="form-control" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save call</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    @endcan
+
+    @can('manageFollowups', $lead)
+    <div class="modal fade" id="scheduleFollowUpModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <form method="POST" action="{{ route('admin.leads.follow-ups.store', $lead) }}" class="modal-content">
+                @csrf
+                <div class="modal-header"><h5 class="modal-title">Schedule follow-up</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body row g-3">
+                    <div class="col-12">
+                        <label class="form-label">When</label>
+                        <input type="datetime-local" name="scheduled_at" class="form-control" required>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Notes</label>
+                        <textarea name="notes" class="form-control" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Schedule</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    @endcan
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 @endsection

@@ -3,6 +3,10 @@
 namespace App\Models;
 
 use App\Enums\AdminRole;
+use App\Enums\SalesTeam;
+use App\Modules\Rbac\Models\CrmRole;
+use App\Modules\Rbac\Services\PermissionResolver;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -12,6 +16,7 @@ use Laravel\Sanctum\HasApiTokens;
 class Admin extends Authenticatable
 {
     use HasApiTokens;
+    use HasFactory;
     use Notifiable;
 
     protected $table = 'admins';
@@ -21,6 +26,8 @@ class Admin extends Authenticatable
         'email',
         'password',
         'role',
+        'crm_role_id',
+        'sales_team',
         'manager_id',
     ];
 
@@ -34,7 +41,19 @@ class Admin extends Authenticatable
         return [
             'password' => 'hashed',
             'role' => AdminRole::class,
+            'sales_team' => SalesTeam::class,
         ];
+    }
+
+    public function onCandidateTeam(): bool
+    {
+        return $this->sales_team === SalesTeam::Candidate
+            || ($this->sales_team === null && $this->hasAnyRole([AdminRole::SalesManager, AdminRole::SalesEmployee]));
+    }
+
+    public function onEmployerTeam(): bool
+    {
+        return $this->sales_team === SalesTeam::Employer;
     }
 
     public function manager(): BelongsTo
@@ -45,6 +64,16 @@ class Admin extends Authenticatable
     public function reports(): HasMany
     {
         return $this->hasMany(self::class, 'manager_id');
+    }
+
+    public function crmRole(): BelongsTo
+    {
+        return $this->belongsTo(CrmRole::class, 'crm_role_id');
+    }
+
+    public function permissionOverrides(): HasMany
+    {
+        return $this->hasMany(CrmAdminPermissionOverride::class);
     }
 
     public function hasRole(AdminRole|string $role): bool
@@ -68,6 +97,22 @@ class Admin extends Authenticatable
 
     public function isAdmin(): bool
     {
-        return $this->role === AdminRole::Admin;
+        return $this->role->isPlatformAdmin();
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return $this->role->isSuperAdmin();
+    }
+
+    public function canPermission(string $slug): bool
+    {
+        return app(PermissionResolver::class)->can($this, $slug);
+    }
+
+    /** @return list<string> */
+    public function permissionSlugs(): array
+    {
+        return app(PermissionResolver::class)->permissionsFor($this);
     }
 }

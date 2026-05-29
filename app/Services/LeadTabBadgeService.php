@@ -31,8 +31,8 @@ class LeadTabBadgeService
      */
     public function leadAttentionCount(Admin $admin): int
     {
-        return match ($admin->role) {
-            AdminRole::Admin, AdminRole::Marketing => $this->visibleLeads($admin)->where(function ($q) {
+        if ($admin->role->hasUnrestrictedLeadVisibility()) {
+            return $this->visibleLeads($admin)->where(function ($q) {
                 $q->where(function ($q2) {
                     $q2->whereNull('assigned_to')
                         ->whereNull('sales_manager_id')
@@ -41,7 +41,10 @@ class LeadTabBadgeService
                     $q2->where('assignment_status', LeadAssignmentStatus::Assigned)
                         ->where('updated_at', '>=', now()->subDays(3));
                 });
-            })->count(),
+            })->count();
+        }
+
+        return match ($admin->role) {
             AdminRole::SalesManager => $this->visibleLeads($admin)->where(function ($q) use ($admin) {
                 $q->where(function ($q2) use ($admin) {
                     $q2->where('assigned_to', $admin->id)

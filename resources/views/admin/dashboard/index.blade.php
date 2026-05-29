@@ -18,6 +18,7 @@
     </div>
 
     @switch($role)
+        @case(\App\Enums\AdminRole::SuperAdmin)
         @case(\App\Enums\AdminRole::Admin)
             <div class="row g-3 g-lg-4">
                 <div class="col-md-4">
@@ -96,6 +97,22 @@
                                     <div class="kpi-value">{{ number_format($totalLeads ?? $totalLeadsTracked) }}</div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-soft">
+                        <div class="card-body">
+                            <div class="kpi-label">Calls today</div>
+                            <div class="kpi-value">{{ number_format($callsToday ?? 0) }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-soft">
+                        <div class="card-body">
+                            <div class="kpi-label">Overdue follow-ups</div>
+                            <div class="kpi-value">{{ number_format($overdueFollowUps ?? 0) }}</div>
                         </div>
                     </div>
                 </div>
@@ -183,6 +200,23 @@
                         </div>
                     </div>
                 </div>
+                <div class="col-md-3">
+                    <div class="card shadow-soft">
+                        <div class="card-body">
+                            <div class="kpi-label">Imported marketing leads</div>
+                            <div class="kpi-value">{{ number_format($importedStandaloneLeads ?? 0) }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-soft">
+                        <div class="card-body">
+                            <div class="kpi-label">Pool size / assignment rate</div>
+                            <div class="kpi-value">{{ number_format($poolSize ?? 0) }}</div>
+                            <div class="small text-muted">{{ $assignmentRate ?? 0 }}% assigned</div>
+                        </div>
+                    </div>
+                </div>
             </div>
             @break
 
@@ -221,6 +255,26 @@
                     </div>
                 </div>
             </div>
+            <div class="row g-3 g-lg-4 mt-1">
+                <div class="col-md-4">
+                    <div class="card shadow-soft"><div class="card-body">
+                        <div class="kpi-label">Calls today (team)</div>
+                        <div class="kpi-value">{{ number_format($callsToday ?? 0) }}</div>
+                    </div></div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-soft"><div class="card-body">
+                        <div class="kpi-label">Overdue follow-ups</div>
+                        <div class="kpi-value">{{ number_format($overdueFollowUps ?? 0) }}</div>
+                    </div></div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-soft"><div class="card-body">
+                        <div class="kpi-label">Team conversion</div>
+                        <div class="kpi-value">{{ $teamConversion ?? 0 }}%</div>
+                    </div></div>
+                </div>
+            </div>
             <div class="text-muted small mt-2">Total in your scope: <strong>{{ number_format($totalInScope) }}</strong></div>
             @break
 
@@ -231,6 +285,31 @@
                         <div class="card-body">
                             <div class="kpi-label">Your assigned leads</div>
                             <div class="kpi-value">{{ number_format($totalAssigned) }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-soft">
+                        <div class="card-body">
+                            <div class="kpi-label">My calls today</div>
+                            <div class="kpi-value">{{ number_format($myCallsToday ?? 0) }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-soft">
+                        <div class="card-body">
+                            <div class="kpi-label">Follow-ups today</div>
+                            <div class="kpi-value">{{ number_format($myFollowUpsToday ?? 0) }}</div>
+                            <div class="small text-muted">Overdue: {{ number_format($myOverdueFollowUps ?? 0) }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-soft">
+                        <div class="card-body">
+                            <div class="kpi-label">Conversion</div>
+                            <div class="kpi-value">{{ $conversionPercent ?? 0 }}%</div>
                         </div>
                     </div>
                 </div>

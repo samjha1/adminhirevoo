@@ -3,12 +3,16 @@
 namespace App\Http\Controllers\Admin\Leads;
 
 use App\Enums\AdminRole;
+use App\Enums\SalesTeam;
 use App\Enums\LeadSalesStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Admin;
 use App\Models\AdminLeadStage;
 use App\Models\Hirevo\HirevoCareerConsultationRequest;
 use App\Models\Hirevo\HirevoLead;
+use App\Modules\Leads\Models\CrmCallLog;
+use App\Modules\Leads\Models\CrmFollowUp;
+use App\Modules\Leads\Services\LeadTimelineService;
 use App\Services\CandidateInsightService;
 use App\Services\LeadAssignmentService;
 use App\Services\LeadPipelineService;
@@ -36,7 +40,7 @@ class LeadController extends Controller
 
     public function consultations(Request $request): View
     {
-        abort_unless(auth('admin')->user()->hasAnyRole([AdminRole::Admin, AdminRole::Marketing]), 403);
+        abort_unless($request->user('admin')->canPermission('consultations.view'), 403);
 
         return $this->renderIndexPage($request, 'consultations');
     }
@@ -92,7 +96,7 @@ class LeadController extends Controller
         $leads = $leadQuery->paginate(12, ['*'], 'leads_page')->withQueryString();
 
         $consultations = null;
-        if ($admin->hasAnyRole([AdminRole::Admin, AdminRole::Marketing])) {
+        if ($admin->canPermission('consultations.view')) {
             $consultationQuery = HirevoCareerConsultationRequest::query()
                 ->with('user')
                 ->orderByDesc('created_at');
@@ -112,19 +116,11 @@ class LeadController extends Controller
             $consultations = $consultationQuery->paginate(12, ['*'], 'consultations_page')->withQueryString();
         }
 
-        $assignableManagers = Admin::query()
-            ->where('role', AdminRole::SalesManager)
-            ->orderBy('name')
-            ->get();
-
-        $assignableEmployees = Admin::query()
-            ->where('role', AdminRole::SalesEmployee)
-            ->when($admin->role === AdminRole::SalesManager, fn ($q) => $q->where('manager_id', $admin->id))
-            ->orderBy('name')
-            ->get();
+        $assignableManagers = $this->talentTeamManagers();
+        $assignableEmployees = $this->talentTeamEmployees($admin);
 
         $leadAttentionCount = $this->tabBadges->leadAttentionCount($admin);
-        $pendingConsultationCount = $admin->hasAnyRole([AdminRole::Admin, AdminRole::Marketing])
+        $pendingConsultationCount = $admin->canPermission('consultations.view')
             ? $this->tabBadges->pendingConsultationCount()
             : 0;
 
@@ -146,12 +142,36 @@ class LeadController extends Controller
             'pendingConsultationCount' => $pendingConsultationCount,
             'activeTab' => $activeTab,
             'showAssigneeFilter' => $showAssigneeFilter,
-            'assigneeFilterEmployees' => Admin::query()
-                ->where('role', AdminRole::SalesEmployee)
-                ->when($admin->role === AdminRole::SalesManager, fn ($q) => $q->where('manager_id', $admin->id))
-                ->orderBy('name')
-                ->get(),
+            'assigneeFilterEmployees' => $this->talentTeamEmployees($admin),
+            'pipeline' => SalesTeam::Candidate,
         ]);
+    }
+
+    /** @return \Illuminate\Database\Eloquent\Collection<int, Admin> */
+    private function talentTeamManagers(): \Illuminate\Database\Eloquent\Collection
+    {
+        return Admin::query()
+            ->where('role', AdminRole::SalesManager)
+            ->where(function ($q) {
+                $q->where('sales_team', SalesTeam::Candidate->value)
+                    ->orWhereNull('sales_team');
+            })
+            ->orderBy('name')
+            ->get();
+    }
+
+    /** @return \Illuminate\Database\Eloquent\Collection<int, Admin> */
+    private function talentTeamEmployees(Admin $admin): \Illuminate\Database\Eloquent\Collection
+    {
+        return Admin::query()
+            ->where('role', AdminRole::SalesEmployee)
+            ->where(function ($q) {
+                $q->where('sales_team', SalesTeam::Candidate->value)
+                    ->orWhereNull('sales_team');
+            })
+            ->when($admin->role === AdminRole::SalesManager, fn ($q) => $q->where('manager_id', $admin->id))
+            ->orderBy('name')
+            ->get();
     }
 
     public function bulkAssignManagers(Request $request): RedirectResponse
@@ -163,7 +183,7 @@ class LeadController extends Controller
         ]);
 
         $actor = auth('admin')->user();
-        abort_unless($actor->hasAnyRole([AdminRole::Admin, AdminRole::Marketing]), 403);
+        abort_unless($actor->canPermission('leads.assign_manager'), 403);
 
         $manager = Admin::query()->findOrFail((int) $validated['manager_id']);
         $result = $this->assignmentService->bulkAssignToSalesManagers($validated['lead_ids'], $manager, $actor);
@@ -180,7 +200,7 @@ class LeadController extends Controller
         ]);
 
         $manager = auth('admin')->user();
-        abort_unless($manager->role === AdminRole::SalesManager, 403);
+        abort_unless($manager->canPermission('leads.assign_employee'), 403);
 
         $employee = Admin::query()->findOrFail((int) $validated['employee_id']);
         $result = $this->assignmentService->bulkAssignToEmployees($validated['lead_ids'], $employee, $manager);
@@ -218,7 +238,7 @@ class LeadController extends Controller
         return $redirect;
     }
 
-    public function showLead(HirevoLead $lead): View
+    public function showLead(HirevoLead $lead, LeadTimelineService $timelineService): View
     {
         $this->authorize('view', $lead);
 
@@ -238,7 +258,7 @@ class LeadController extends Controller
         ]);
 
         $relatedConsultations = collect();
-        if ($admin->hasAnyRole([AdminRole::Admin, AdminRole::Marketing])) {
+        if ($admin->canPermission('consultations.view')) {
             $relatedConsultations = HirevoCareerConsultationRequest::query()
                 ->with('user')
                 ->where('user_id', $lead->candidate_id)
@@ -250,19 +270,8 @@ class LeadController extends Controller
         $primaryResume = $lead->candidate?->resumes?->first();
         $insight = $this->candidateInsightService->buildLeadInsight($lead);
 
-        $assignableManagers = Admin::query()
-            ->where('role', AdminRole::SalesManager)
-            ->orderBy('name')
-            ->get();
-
-        $assignableEmployees = Admin::query()
-            ->where('role', AdminRole::SalesEmployee)
-            ->when(
-                $admin->role === AdminRole::SalesManager,
-                fn ($q) => $q->where('manager_id', $admin->id)
-            )
-            ->orderBy('name')
-            ->get();
+        $assignableManagers = $this->talentTeamManagers();
+        $assignableEmployees = $this->talentTeamEmployees($admin);
 
         return view('admin.leads.show-lead', [
             'lead' => $lead,
@@ -274,6 +283,9 @@ class LeadController extends Controller
             'salesStatuses' => LeadSalesStatus::cases(),
             'assignableManagers' => $assignableManagers,
             'assignableEmployees' => $assignableEmployees,
+            'timeline' => $timelineService->forLead($lead),
+            'recentCalls' => CrmCallLog::query()->where('lead_id', $lead->id)->with('admin')->orderByDesc('called_at')->limit(5)->get(),
+            'upcomingFollowUps' => CrmFollowUp::query()->where('lead_id', $lead->id)->with('admin')->orderBy('scheduled_at')->limit(5)->get(),
         ]);
     }
 
@@ -385,7 +397,7 @@ class LeadController extends Controller
 
     public function showConsultation(HirevoCareerConsultationRequest $consultation): View
     {
-        abort_unless(auth('admin')->user()->hasAnyRole([AdminRole::Admin, AdminRole::Marketing]), 403);
+        abort_unless(auth('admin')->user()->canPermission('consultations.view'), 403);
 
         $consultation->load('user');
 

@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Admin\Staff;
 
 use App\Enums\AdminRole;
+use App\Enums\SalesTeam;
 use App\Http\Controllers\Controller;
 use App\Models\Admin;
+use App\Modules\Rbac\Models\CrmRole;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -64,11 +66,12 @@ class AdminStaffController extends Controller
                 'password' => ['required', 'string', 'min:8', 'confirmed'],
             ]);
 
-            Admin::query()->create([
+            $this->createStaff([
                 'name' => $validated['name'],
                 'email' => $validated['email'],
                 'password' => Hash::make($validated['password']),
                 'role' => AdminRole::SalesEmployee,
+                'sales_team' => $actor->sales_team ?? SalesTeam::Candidate,
                 'manager_id' => $actor->id,
             ]);
 
@@ -80,6 +83,7 @@ class AdminStaffController extends Controller
             'email' => ['required', 'email', 'max:255', 'unique:admins,email'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'role' => ['required', Rule::enum(AdminRole::class)],
+            'sales_team' => ['nullable', Rule::enum(SalesTeam::class)],
             'manager_id' => ['nullable', 'exists:admins,id'],
         ]);
 
@@ -87,15 +91,46 @@ class AdminStaffController extends Controller
             return back()->withErrors(['manager_id' => 'Sales employees must report to a manager.'])->withInput();
         }
 
-        Admin::query()->create([
+        $role = AdminRole::from($validated['role']);
+        $team = isset($validated['sales_team'])
+            ? SalesTeam::from($validated['sales_team'])
+            : $this->defaultTeamForRole($role);
+
+        $this->createStaff([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
-            'role' => $validated['role'],
+            'role' => $role,
+            'sales_team' => $team,
             'manager_id' => $validated['manager_id'] ?? null,
         ]);
 
         return redirect()->route('admin.staff.index')->with('success', 'Staff user created.');
+    }
+
+    /** @param  array{name: string, email: string, password: string, role: AdminRole, sales_team?: ?SalesTeam, manager_id: ?int}  $data */
+    private function createStaff(array $data): Admin
+    {
+        $crmRole = CrmRole::query()->where('slug', $data['role']->crmRoleSlug())->first();
+        $team = $data['sales_team'] ?? $this->defaultTeamForRole($data['role']);
+
+        return Admin::query()->create([
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'password' => $data['password'],
+            'role' => $data['role'],
+            'crm_role_id' => $crmRole?->id,
+            'sales_team' => $team?->value,
+            'manager_id' => $data['manager_id'],
+        ]);
+    }
+
+    private function defaultTeamForRole(AdminRole $role): ?SalesTeam
+    {
+        return match ($role) {
+            AdminRole::SalesManager, AdminRole::SalesEmployee => SalesTeam::Candidate,
+            default => null,
+        };
     }
 
     public function edit(Admin $staff): View
@@ -141,6 +176,7 @@ class AdminStaffController extends Controller
             'email' => ['required', 'email', 'max:255', Rule::unique('admins', 'email')->ignore($staff->id)],
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
             'role' => ['required', Rule::enum(AdminRole::class)],
+            'sales_team' => ['nullable', Rule::enum(SalesTeam::class)],
             'manager_id' => ['nullable', 'exists:admins,id'],
         ]);
 

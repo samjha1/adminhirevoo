@@ -12,6 +12,10 @@ use App\Models\Hirevo\HirevoLead;
 use App\Models\Hirevo\HirevoPayment;
 use App\Models\Hirevo\HirevoReferralRequest;
 use App\Models\Hirevo\HirevoUser;
+use App\Modules\Leads\Enums\FollowUpStatus;
+use App\Modules\Leads\Models\CrmCallLog;
+use App\Modules\Leads\Models\CrmFollowUp;
+use App\Modules\Leads\Models\CrmStandaloneLead;
 
 class RoleDashboardService
 {
@@ -23,7 +27,7 @@ class RoleDashboardService
     public function metricsFor(Admin $admin): array
     {
         return match ($admin->role) {
-            AdminRole::Admin => $this->adminMetrics(),
+            AdminRole::SuperAdmin, AdminRole::Admin => $this->adminMetrics(),
             AdminRole::Marketing => $this->marketingMetrics(),
             AdminRole::SalesManager => $this->salesManagerMetrics($admin),
             AdminRole::SalesEmployee => $this->salesEmployeeMetrics($admin),
@@ -70,6 +74,8 @@ class RoleDashboardService
             'totalLeadsTracked' => $totalLeadsTracked,
             'pendingConsultations' => $pendingConsultations,
             'totalLeads' => HirevoLead::query()->count(),
+            'callsToday' => CrmCallLog::query()->whereDate('called_at', today())->count(),
+            'overdueFollowUps' => CrmFollowUp::query()->where('status', FollowUpStatus::Overdue)->count(),
         ];
     }
 
@@ -85,12 +91,19 @@ class RoleDashboardService
             ->whereNotNull('assigned_to')
             ->count();
 
+        $importedStandalone = CrmStandaloneLead::query()->count();
+        $poolSize = $unassigned + CrmStandaloneLead::query()->whereNull('sales_manager_id')->count();
+        $assignmentRate = $totalLeads > 0 ? round(($assigned / $totalLeads) * 100, 1) : 0;
+
         return [
             'role' => AdminRole::Marketing,
             'totalLeads' => $totalLeads,
             'totalConsultationRequests' => $totalConsultations,
             'unassignedLeads' => $unassigned,
             'assignedLeads' => $assigned,
+            'importedStandaloneLeads' => $importedStandalone,
+            'poolSize' => $poolSize,
+            'assignmentRate' => $assignmentRate,
         ];
     }
 
@@ -101,6 +114,8 @@ class RoleDashboardService
                 ->orWhere('assigned_to', $admin->id);
         });
 
+        $leadIds = (clone $base)->pluck('id');
+
         $toMe = (clone $base)->where('assigned_to', $admin->id)->count();
         $toEmployees = HirevoLead::query()
             ->where('sales_manager_id', $admin->id)
@@ -110,6 +125,8 @@ class RoleDashboardService
         $inProgress = (clone $base)->where('assignment_status', LeadAssignmentStatus::InProgress)->count();
         $closed = (clone $base)->where('assignment_status', LeadAssignmentStatus::Closed)->count();
 
+        $teamAdminIds = Admin::query()->where('manager_id', $admin->id)->pluck('id')->push($admin->id);
+
         return [
             'role' => AdminRole::SalesManager,
             'leadsAssignedToMe' => $toMe,
@@ -117,12 +134,23 @@ class RoleDashboardService
             'inProgress' => $inProgress,
             'closed' => $closed,
             'totalInScope' => (clone $base)->count(),
+            'callsToday' => CrmCallLog::query()
+                ->whereIn('admin_id', $teamAdminIds)
+                ->whereDate('called_at', today())
+                ->count(),
+            'overdueFollowUps' => CrmFollowUp::query()
+                ->whereIn('admin_id', $teamAdminIds)
+                ->whereIn('status', [FollowUpStatus::Overdue, FollowUpStatus::Pending])
+                ->where('scheduled_at', '<', now())
+                ->count(),
+            'teamConversion' => $this->teamConversionPercent($leadIds),
         ];
     }
 
     private function salesEmployeeMetrics(Admin $admin): array
     {
         $q = HirevoLead::query()->where('assigned_to', $admin->id);
+        $leadIds = (clone $q)->pluck('id');
 
         $bySalesStatus = (clone $q)
             ->selectRaw('sales_status, COUNT(*) as aggregate')
@@ -132,11 +160,43 @@ class RoleDashboardService
 
         $recent = (clone $q)->orderByDesc('updated_at')->limit(5)->get();
 
+        $total = (clone $q)->count();
+        $converted = (clone $q)->where('sales_status', 'converted')->count();
+        $conversionPct = $total > 0 ? round(($converted / $total) * 100, 1) : 0;
+
         return [
             'role' => AdminRole::SalesEmployee,
-            'totalAssigned' => (clone $q)->count(),
+            'totalAssigned' => $total,
             'salesStatusBreakdown' => $bySalesStatus,
             'recentLeads' => $recent,
+            'myCallsToday' => CrmCallLog::query()
+                ->where('admin_id', $admin->id)
+                ->whereDate('called_at', today())
+                ->count(),
+            'myFollowUpsToday' => CrmFollowUp::query()
+                ->where('admin_id', $admin->id)
+                ->whereDate('scheduled_at', today())
+                ->where('status', FollowUpStatus::Pending)
+                ->count(),
+            'myOverdueFollowUps' => CrmFollowUp::query()
+                ->where('admin_id', $admin->id)
+                ->where('scheduled_at', '<', now())
+                ->whereIn('status', [FollowUpStatus::Pending, FollowUpStatus::Overdue])
+                ->count(),
+            'conversionPercent' => $conversionPct,
         ];
+    }
+
+    /** @param  \Illuminate\Support\Collection<int, int>  $leadIds */
+    private function teamConversionPercent($leadIds): float
+    {
+        if ($leadIds->isEmpty()) {
+            return 0;
+        }
+
+        $total = HirevoLead::query()->whereIn('id', $leadIds)->count();
+        $converted = HirevoLead::query()->whereIn('id', $leadIds)->where('sales_status', 'converted')->count();
+
+        return $total > 0 ? round(($converted / $total) * 100, 1) : 0;
     }
 }

@@ -12,19 +12,23 @@ class LeadVisibilityService
     /** @param  Builder<HirevoLead>  $query */
     public function restrictVisibleLeads(Builder $query, Admin $admin): void
     {
+        if ($admin->role->hasUnrestrictedLeadVisibility()) {
+            return;
+        }
+
         match ($admin->role) {
-            AdminRole::Admin, AdminRole::Marketing => null,
             AdminRole::SalesManager => $query->where(function (Builder $q) use ($admin) {
                 $q->where('sales_manager_id', $admin->id)
                     ->orWhere('assigned_to', $admin->id);
             }),
             AdminRole::SalesEmployee => $query->where('assigned_to', $admin->id),
+            default => null,
         };
     }
 
     public function canViewLead(Admin $admin, HirevoLead $lead): bool
     {
-        if ($admin->hasAnyRole([AdminRole::Admin, AdminRole::Marketing])) {
+        if ($admin->role->hasUnrestrictedLeadVisibility()) {
             return true;
         }
 

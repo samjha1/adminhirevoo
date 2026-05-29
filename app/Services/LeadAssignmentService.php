@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\AdminRole;
+use App\Enums\SalesTeam;
 use App\Enums\AssignmentRoleLevel;
 use App\Enums\LeadAssignmentActionType;
 use App\Enums\LeadAssignmentStatus;
@@ -19,6 +20,7 @@ class LeadAssignmentService
 {
     public function __construct(
         private readonly AuditLogService $audit,
+        private readonly SalesTeamService $teams,
     ) {}
 
     public function assignToSalesManager(HirevoLead $lead, Admin $manager, Admin $actor): HirevoLead
@@ -26,9 +28,7 @@ class LeadAssignmentService
         if (! $actor->hasAnyRole([AdminRole::Admin, AdminRole::Marketing])) {
             throw new InvalidArgumentException('Only admin or marketing can assign to a sales manager.');
         }
-        if ($manager->role !== AdminRole::SalesManager) {
-            throw new InvalidArgumentException('Target must be a sales manager.');
-        }
+        $this->assertCandidateManager($manager);
 
         return DB::transaction(function () use ($lead, $manager, $actor) {
             $from = $lead->assigned_to;
@@ -51,9 +51,7 @@ class LeadAssignmentService
         if (! $actor->hasAnyRole([AdminRole::Admin, AdminRole::Marketing])) {
             throw new InvalidArgumentException('Only admin or marketing can reassign managers.');
         }
-        if ($newManager->role !== AdminRole::SalesManager) {
-            throw new InvalidArgumentException('Target must be a sales manager.');
-        }
+        $this->assertCandidateManager($newManager);
 
         return DB::transaction(function () use ($lead, $newManager, $actor) {
             $from = $lead->assigned_to;
@@ -76,12 +74,7 @@ class LeadAssignmentService
         if ($manager->role !== AdminRole::SalesManager) {
             throw new InvalidArgumentException('Only a sales manager can assign to employees.');
         }
-        if ($employee->role !== AdminRole::SalesEmployee) {
-            throw new InvalidArgumentException('Target must be a sales employee.');
-        }
-        if ((int) $employee->manager_id !== (int) $manager->id) {
-            throw new InvalidArgumentException('Employee must report to this manager.');
-        }
+        $this->assertCandidateEmployee($employee, $manager);
         if ($lead->sales_manager_id !== $manager->id && $lead->assigned_to !== $manager->id) {
             throw new InvalidArgumentException('Lead is not owned by this manager.');
         }
@@ -104,12 +97,7 @@ class LeadAssignmentService
 
     public function reassignEmployee(HirevoLead $lead, Admin $newEmployee, Admin $manager): HirevoLead
     {
-        if ($newEmployee->role !== AdminRole::SalesEmployee) {
-            throw new InvalidArgumentException('Target must be a sales employee.');
-        }
-        if ((int) $newEmployee->manager_id !== (int) $manager->id) {
-            throw new InvalidArgumentException('Employee must report to this manager.');
-        }
+        $this->assertCandidateEmployee($newEmployee, $manager);
         if ($lead->sales_manager_id !== $manager->id) {
             throw new InvalidArgumentException('Lead is not owned by this manager.');
         }
@@ -302,6 +290,30 @@ class LeadAssignmentService
 
             return $lead->fresh();
         });
+    }
+
+    private function assertCandidateManager(Admin $manager): void
+    {
+        if ($manager->role !== AdminRole::SalesManager) {
+            throw new InvalidArgumentException('Target must be a talent team sales manager.');
+        }
+        $team = $this->teams->teamFor($manager);
+        if ($team === SalesTeam::Employer) {
+            throw new InvalidArgumentException('Use the company pipeline to assign employer team managers.');
+        }
+    }
+
+    private function assertCandidateEmployee(Admin $employee, Admin $manager): void
+    {
+        if ($employee->role !== AdminRole::SalesEmployee) {
+            throw new InvalidArgumentException('Target must be a talent team sales executive.');
+        }
+        if ($this->teams->teamFor($employee) === SalesTeam::Employer) {
+            throw new InvalidArgumentException('Use the company pipeline for employer team executives.');
+        }
+        if ((int) $employee->manager_id !== (int) $manager->id) {
+            throw new InvalidArgumentException('Employee must report to this manager.');
+        }
     }
 
     private function history(
