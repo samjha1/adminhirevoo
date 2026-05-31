@@ -281,84 +281,99 @@
                     </div>
                 </div>
 
+                @php
+                    $atEmployee = $lead->assignment_role_level === \App\Enums\AssignmentRoleLevel::Employee;
+                    $hasManager = $lead->sales_manager_id !== null;
+                    $inPool = $lead->assigned_to === null && $lead->sales_manager_id === null;
+                @endphp
+
                 @can('assignAsMarketing', $lead)
                     <div class="assign-actions">
                         <div class="fw-semibold text-dark mb-2 small text-uppercase">Marketing / admin routing</div>
-                        <form method="POST" action="{{ route('admin.leads.assign-manager', $lead) }}" class="row g-2 align-items-end mb-3">
-                            @csrf
-                            <div class="col-md-6">
-                                <label class="form-label mb-1">Assign to sales manager</label>
-                                <select name="manager_id" class="form-select form-select-sm" required>
-                                    <option value="">Select manager…</option>
-                                    @foreach($assignableManagers as $m)
-                                        <option value="{{ $m->id }}" @selected($lead->assigned_to === $m->id && $lead->sales_manager_id === $m->id)>{{ $m->name }} ({{ $m->email }})</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <button type="submit" class="btn btn-sm btn-primary w-100">Assign</button>
-                            </div>
-                        </form>
-                        <form method="POST" action="{{ route('admin.leads.reassign-manager', $lead) }}" class="row g-2 align-items-end mb-3">
-                            @csrf
-                            <div class="col-md-6">
-                                <label class="form-label mb-1">Reassign to another manager</label>
-                                <select name="manager_id" class="form-select form-select-sm" required>
-                                    <option value="">Select manager…</option>
-                                    @foreach($assignableManagers as $m)
-                                        <option value="{{ $m->id }}">{{ $m->name }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <button type="submit" class="btn btn-sm btn-outline-primary w-100">Reassign</button>
-                            </div>
-                        </form>
-                        <form method="POST" action="{{ route('admin.leads.release', $lead) }}" onsubmit="return confirm('Return this lead to the unassigned pool?');" class="d-inline">
-                            @csrf
-                            <button type="submit" class="btn btn-sm btn-outline-danger">Unassign (pool)</button>
-                        </form>
+                        @if($inPool || ! $hasManager)
+                            <form method="POST" action="{{ route('admin.leads.assign-manager', $lead) }}" class="row g-2 align-items-end mb-3">
+                                @csrf
+                                <div class="col-md-6">
+                                    <label class="form-label mb-1">Assign to sales manager</label>
+                                    <select name="manager_id" class="form-select form-select-sm" required>
+                                        <option value="">Select manager…</option>
+                                        @foreach($assignableManagers as $m)
+                                            <option value="{{ $m->id }}">{{ $m->name }} ({{ $m->email }})</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <button type="submit" class="btn btn-sm btn-primary w-100">Assign</button>
+                                </div>
+                            </form>
+                        @endif
+                        @if($hasManager && ! $atEmployee)
+                            <form method="POST" action="{{ route('admin.leads.reassign-manager', $lead) }}" class="row g-2 align-items-end mb-3">
+                                @csrf
+                                <div class="col-md-6">
+                                    <label class="form-label mb-1">Reassign to another manager</label>
+                                    <select name="manager_id" class="form-select form-select-sm" required>
+                                        <option value="">Select manager…</option>
+                                        @foreach($assignableManagers as $m)
+                                            <option value="{{ $m->id }}" @selected((int) $lead->sales_manager_id === (int) $m->id)>{{ $m->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <button type="submit" class="btn btn-sm btn-outline-primary w-100">Reassign</button>
+                                </div>
+                            </form>
+                        @endif
+                        @if(! $inPool)
+                            <form method="POST" action="{{ route('admin.leads.release', $lead) }}" onsubmit="return confirm('Return this lead to the unassigned pool?');" class="d-inline">
+                                @csrf
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Unassign (pool)</button>
+                            </form>
+                        @endif
                     </div>
                 @endcan
 
                 @can('assignAsManager', $lead)
                     <div class="assign-actions">
                         <div class="fw-semibold text-dark mb-2 small text-uppercase">Sales manager — team ownership</div>
-                        <form method="POST" action="{{ route('admin.leads.assign-employee', $lead) }}" class="row g-2 align-items-end mb-3">
-                            @csrf
-                            <div class="col-md-6">
-                                <label class="form-label mb-1">Assign to employee</label>
-                                <select name="employee_id" class="form-select form-select-sm" required>
-                                    <option value="">Select employee…</option>
-                                    @foreach($assignableEmployees as $e)
-                                        <option value="{{ $e->id }}" @selected($lead->assigned_to === $e->id)>{{ $e->name }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <button type="submit" class="btn btn-sm btn-primary w-100">Assign</button>
-                            </div>
-                        </form>
-                        <form method="POST" action="{{ route('admin.leads.reassign-employee', $lead) }}" class="row g-2 align-items-end mb-2">
-                            @csrf
-                            <div class="col-md-6">
-                                <label class="form-label mb-1">Reassign employee</label>
-                                <select name="employee_id" class="form-select form-select-sm" required>
-                                    @foreach($assignableEmployees as $e)
-                                        <option value="{{ $e->id }}">{{ $e->name }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <button type="submit" class="btn btn-sm btn-outline-primary w-100">Reassign</button>
-                            </div>
-                        </form>
+                        @if(! $atEmployee)
+                            <form method="POST" action="{{ route('admin.leads.assign-employee', $lead) }}" class="row g-2 align-items-end mb-3">
+                                @csrf
+                                <div class="col-md-6">
+                                    <label class="form-label mb-1">Assign to employee</label>
+                                    <select name="employee_id" class="form-select form-select-sm" required>
+                                        <option value="">Select employee…</option>
+                                        @foreach($assignableEmployees as $e)
+                                            <option value="{{ $e->id }}">{{ $e->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <button type="submit" class="btn btn-sm btn-primary w-100">Assign</button>
+                                </div>
+                            </form>
+                        @else
+                            <form method="POST" action="{{ route('admin.leads.reassign-employee', $lead) }}" class="row g-2 align-items-end mb-2">
+                                @csrf
+                                <div class="col-md-6">
+                                    <label class="form-label mb-1">Reassign to another employee</label>
+                                    <select name="employee_id" class="form-select form-select-sm" required>
+                                        @foreach($assignableEmployees as $e)
+                                            <option value="{{ $e->id }}" @selected((int) $lead->assigned_to === (int) $e->id)>{{ $e->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <button type="submit" class="btn btn-sm btn-outline-primary w-100">Reassign</button>
+                                </div>
+                            </form>
+                        @endif
                     </div>
                 @endcan
 
                 @can('takeBack', $lead)
                     <div class="assign-actions pt-3">
-                        <form method="POST" action="{{ route('admin.leads.take-back', $lead) }}" class="d-inline">
+                        <form method="POST" action="{{ route('admin.leads.take-back', $lead) }}" onsubmit="return confirm('Take this lead back from the executive to you?');" class="d-inline">
                             @csrf
                             <button type="submit" class="btn btn-sm btn-warning">Take back from employee</button>
                         </form>

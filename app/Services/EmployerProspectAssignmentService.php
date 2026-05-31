@@ -10,6 +10,7 @@ use App\Enums\SalesTeam;
 use App\Models\Admin;
 use App\Modules\Leads\Models\CrmEmployerProspect;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 
 class EmployerProspectAssignmentService
@@ -17,6 +18,7 @@ class EmployerProspectAssignmentService
     public function __construct(
         private readonly SalesTeamService $teams,
         private readonly AuditLogService $audit,
+        private readonly EmployerProspectVisibilityService $visibility,
     ) {
     }
 
@@ -41,6 +43,9 @@ class EmployerProspectAssignmentService
 
     public function assignToEmployee(CrmEmployerProspect $prospect, Admin $employee, Admin $manager): CrmEmployerProspect
     {
+        if (! $manager->canPermission('leads.assign_employee')) {
+            throw new InvalidArgumentException('You do not have permission to assign companies to executives.');
+        }
         $this->assertEmployerManager($manager);
         $this->assertEmployerEmployee($employee, $manager);
 
@@ -71,9 +76,20 @@ class EmployerProspectAssignmentService
         $result = ['success' => 0, 'skipped' => 0, 'errors' => []];
 
         foreach ($prospectIds as $id) {
+            $id = (int) $id;
             try {
-                $prospect = CrmEmployerProspect::query()->findOrFail((int) $id);
-                if ($prospect->sales_manager_id === $manager->id) {
+                $prospect = CrmEmployerProspect::query()->find($id);
+                if (! $prospect) {
+                    $result['errors'][$id] = 'Company not found.';
+
+                    continue;
+                }
+                if (! $this->visibility->canView($actor, $prospect)) {
+                    $result['errors'][$id] = 'You cannot assign this company.';
+
+                    continue;
+                }
+                if ((int) $prospect->sales_manager_id === (int) $manager->id) {
                     $result['skipped']++;
 
                     continue;
@@ -81,7 +97,7 @@ class EmployerProspectAssignmentService
                 $this->assignToSalesManager($prospect, $manager, $actor);
                 $result['success']++;
             } catch (\Throwable $e) {
-                $result['errors'][(int) $id] = $e->getMessage();
+                $result['errors'][$id] = Str::limit($e->getMessage(), 140);
             }
         }
 
@@ -97,9 +113,20 @@ class EmployerProspectAssignmentService
         $result = ['success' => 0, 'skipped' => 0, 'errors' => []];
 
         foreach ($prospectIds as $id) {
+            $id = (int) $id;
             try {
-                $prospect = CrmEmployerProspect::query()->findOrFail((int) $id);
-                if ($prospect->assigned_to === $employee->id) {
+                $prospect = CrmEmployerProspect::query()->find($id);
+                if (! $prospect) {
+                    $result['errors'][$id] = 'Company not found.';
+
+                    continue;
+                }
+                if (! $this->visibility->canView($manager, $prospect)) {
+                    $result['errors'][$id] = 'You cannot assign this company.';
+
+                    continue;
+                }
+                if ((int) $prospect->assigned_to === (int) $employee->id) {
                     $result['skipped']++;
 
                     continue;
@@ -107,7 +134,7 @@ class EmployerProspectAssignmentService
                 $this->assignToEmployee($prospect, $employee, $manager);
                 $result['success']++;
             } catch (\Throwable $e) {
-                $result['errors'][(int) $id] = $e->getMessage();
+                $result['errors'][$id] = Str::limit($e->getMessage(), 140);
             }
         }
 
@@ -116,8 +143,8 @@ class EmployerProspectAssignmentService
 
     private function assertMarketingActor(Admin $actor): void
     {
-        if (! $actor->role?->hasUnrestrictedLeadVisibility() && $actor->role !== AdminRole::Marketing) {
-            throw new InvalidArgumentException('Only marketing or admin can assign company prospects to managers.');
+        if (! $actor->canPermission('leads.assign_manager')) {
+            throw new InvalidArgumentException('You do not have permission to assign companies to managers.');
         }
     }
 

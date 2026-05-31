@@ -167,6 +167,33 @@
             @break
 
         @case(\App\Enums\AdminRole::Marketing)
+            @if(isset($period))
+                @include('partials.dashboard-period-filter', ['period' => $period])
+            @endif
+            @if(!empty($talentSummary) && !empty($companySummary))
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <div class="card shadow-soft border-primary border-opacity-25">
+                            <div class="card-header bg-white fw-semibold text-primary">Talent pipeline · {{ $period->label() ?? '' }}</div>
+                            <div class="card-body pt-0">
+                                @include('partials.dashboard-summary-cards', ['summary' => $talentSummary])
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card shadow-soft border-success border-opacity-25">
+                            <div class="card-header bg-white fw-semibold text-success">Company pipeline · {{ $period->label() ?? '' }}</div>
+                            <div class="card-body pt-0">
+                                @include('partials.dashboard-summary-cards', ['summary' => $companySummary])
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex gap-2 mb-3">
+                    <a href="{{ route('admin.leads.index') }}" class="btn btn-sm btn-outline-primary">Talent leads</a>
+                    <a href="{{ route('admin.employers.pipeline.index') }}" class="btn btn-sm btn-outline-success">Companies</a>
+                </div>
+            @endif
             <div class="row g-3 g-lg-4">
                 <div class="col-md-3">
                     <div class="card shadow-soft">

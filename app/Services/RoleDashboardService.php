@@ -16,21 +16,26 @@ use App\Modules\Leads\Enums\FollowUpStatus;
 use App\Modules\Leads\Models\CrmCallLog;
 use App\Modules\Leads\Models\CrmFollowUp;
 use App\Modules\Leads\Models\CrmStandaloneLead;
+use App\Support\DashboardPeriod;
 
 class RoleDashboardService
 {
     public function __construct(
         private readonly LeadPipelineService $leadPipeline,
+        private readonly DashboardPipelineMetrics $pipelineMetrics,
+        private readonly DashboardScopeService $scope,
     ) {
     }
 
-    public function metricsFor(Admin $admin): array
+    public function metricsFor(Admin $admin, ?DashboardPeriod $period = null): array
     {
+        $period ??= DashboardPeriod::forPreset('this_month');
+
         return match ($admin->role) {
             AdminRole::SuperAdmin, AdminRole::Admin => $this->adminMetrics(),
-            AdminRole::Marketing => $this->marketingMetrics(),
-            AdminRole::SalesManager => $this->salesManagerMetrics($admin),
-            AdminRole::SalesEmployee => $this->salesEmployeeMetrics($admin),
+            AdminRole::Marketing => $this->marketingMetrics($period),
+            AdminRole::SalesManager => $this->salesManagerMetrics($admin, $period),
+            AdminRole::SalesEmployee => $this->salesEmployeeMetrics($admin, $period),
         };
     }
 
@@ -79,8 +84,12 @@ class RoleDashboardService
         ];
     }
 
-    private function marketingMetrics(): array
+    private function marketingMetrics(DashboardPeriod $period): array
     {
+        // Marketing has unrestricted visibility — use unscoped queries
+        $companySummary = $this->pipelineMetrics->companySummary(null, $period);
+        $talentSummary = $this->pipelineMetrics->talentSummary(null, $period);
+
         $totalLeads = HirevoLead::query()->count();
         $totalConsultations = HirevoCareerConsultationRequest::query()->count();
         $unassigned = HirevoLead::query()
@@ -104,10 +113,13 @@ class RoleDashboardService
             'importedStandaloneLeads' => $importedStandalone,
             'poolSize' => $poolSize,
             'assignmentRate' => $assignmentRate,
+            'period' => $period,
+            'talentSummary' => $talentSummary,
+            'companySummary' => $companySummary,
         ];
     }
 
-    private function salesManagerMetrics(Admin $admin): array
+    private function salesManagerMetrics(Admin $admin, DashboardPeriod $period): array
     {
         $base = HirevoLead::query()->where(function ($q) use ($admin) {
             $q->where('sales_manager_id', $admin->id)
@@ -127,13 +139,20 @@ class RoleDashboardService
 
         $teamAdminIds = Admin::query()->where('manager_id', $admin->id)->pluck('id')->push($admin->id);
 
+        $mySummary = $this->pipelineMetrics->talentSummary(
+            HirevoLead::query()->where('assigned_to', $admin->id),
+            $period,
+        );
+
         return [
             'role' => AdminRole::SalesManager,
+            'period' => $period,
             'leadsAssignedToMe' => $toMe,
             'leadsWithEmployees' => $toEmployees,
             'inProgress' => $inProgress,
             'closed' => $closed,
             'totalInScope' => (clone $base)->count(),
+            'myPerformance' => $mySummary,
             'callsToday' => CrmCallLog::query()
                 ->whereIn('admin_id', $teamAdminIds)
                 ->whereDate('called_at', today())
@@ -147,7 +166,7 @@ class RoleDashboardService
         ];
     }
 
-    private function salesEmployeeMetrics(Admin $admin): array
+    private function salesEmployeeMetrics(Admin $admin, DashboardPeriod $period): array
     {
         $q = HirevoLead::query()->where('assigned_to', $admin->id);
         $leadIds = (clone $q)->pluck('id');
@@ -164,8 +183,12 @@ class RoleDashboardService
         $converted = (clone $q)->where('sales_status', 'converted')->count();
         $conversionPct = $total > 0 ? round(($converted / $total) * 100, 1) : 0;
 
+        $mySummary = $this->pipelineMetrics->talentSummary($q, $period);
+
         return [
             'role' => AdminRole::SalesEmployee,
+            'period' => $period,
+            'myPerformance' => $mySummary,
             'totalAssigned' => $total,
             'salesStatusBreakdown' => $bySalesStatus,
             'recentLeads' => $recent,

@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Admin\Dashboard\DashboardController;
+use App\Http\Controllers\Admin\Dashboard\DashboardExportController;
+use App\Http\Controllers\Admin\Settings\AuditLogController;
 use App\Http\Controllers\Admin\EmployerController;
 use App\Http\Controllers\Admin\JobController;
 use App\Http\Controllers\Admin\Leads\LeadCallController;
@@ -42,6 +44,13 @@ Route::post('/logout', [\App\Http\Controllers\Auth\AdminAuthController::class, '
 
 Route::middleware(['admin.guard', 'auth:admin', 'permission:analytics.view'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
+    Route::get('/dashboard/export', DashboardExportController::class)
+        ->middleware('permission:analytics.export')
+        ->name('admin.dashboard.export');
+});
+
+Route::middleware(['admin.guard', 'auth:admin', 'permission:audit.view'])->group(function () {
+    Route::get('/settings/audit-logs', [AuditLogController::class, 'index'])->name('admin.settings.audit-logs');
 });
 
 Route::middleware(['admin.guard', 'auth:admin', 'permission:leads.view', 'sales.pipeline:candidate'])->group(function () {
@@ -69,22 +78,22 @@ Route::middleware(['admin.guard', 'auth:admin', 'permission:leads.view', 'sales.
         ->middleware('permission:leads.update_sales_status')
         ->name('admin.leads.sales-status');
     Route::post('/leads/{lead}/assign-manager', [LeadController::class, 'assignManager'])
-        ->middleware('permission:leads.assign_manager')
+        ->middleware(['permission:leads.assign_manager', 'throttle:60,1'])
         ->name('admin.leads.assign-manager');
     Route::post('/leads/{lead}/reassign-manager', [LeadController::class, 'reassignManager'])
-        ->middleware('permission:leads.reassign')
+        ->middleware(['permission:leads.reassign', 'throttle:60,1'])
         ->name('admin.leads.reassign-manager');
     Route::post('/leads/{lead}/release', [LeadController::class, 'releaseToPool'])
-        ->middleware('permission:leads.release')
+        ->middleware(['permission:leads.release', 'throttle:60,1'])
         ->name('admin.leads.release');
     Route::post('/leads/{lead}/assign-employee', [LeadController::class, 'assignEmployee'])
-        ->middleware('permission:leads.assign_employee')
+        ->middleware(['permission:leads.assign_employee', 'throttle:60,1'])
         ->name('admin.leads.assign-employee');
     Route::post('/leads/{lead}/reassign-employee', [LeadController::class, 'reassignEmployee'])
-        ->middleware('permission:leads.reassign')
+        ->middleware(['permission:leads.reassign', 'throttle:60,1'])
         ->name('admin.leads.reassign-employee');
     Route::post('/leads/{lead}/take-back', [LeadController::class, 'takeBack'])
-        ->middleware('permission:leads.take_back')
+        ->middleware(['permission:leads.take_back', 'throttle:60,1'])
         ->name('admin.leads.take-back');
     Route::post('/leads/{lead}/calls', [LeadCallController::class, 'store'])
         ->middleware('permission:leads.log_call')

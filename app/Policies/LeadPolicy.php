@@ -74,11 +74,12 @@ class LeadPolicy
 
     public function assignAsManager(Admin $admin, HirevoLead $lead): bool
     {
-        if (! $this->permissions->can($admin, 'leads.assign_employee')) {
+        if (! $this->permissions->can($admin, 'leads.assign_employee') || ! $this->view($admin, $lead)) {
             return false;
         }
 
-        return $lead->sales_manager_id === $admin->id || $lead->assigned_to === $admin->id;
+        return (int) $lead->sales_manager_id === (int) $admin->id
+            || (int) $lead->assigned_to === (int) $admin->id;
     }
 
     public function takeBack(Admin $admin, HirevoLead $lead): bool
@@ -87,8 +88,15 @@ class LeadPolicy
             return false;
         }
 
-        return $lead->sales_manager_id === $admin->id
-            && $lead->assignment_role_level === \App\Enums\AssignmentRoleLevel::Employee;
+        if ($lead->assignment_role_level !== \App\Enums\AssignmentRoleLevel::Employee) {
+            return false;
+        }
+
+        if ($admin->role?->isSuperAdmin() || $this->permissions->can($admin, 'leads.view_all')) {
+            return $this->view($admin, $lead);
+        }
+
+        return (int) $lead->sales_manager_id === (int) $admin->id;
     }
 
     public function releaseToPool(Admin $admin, HirevoLead $lead): bool

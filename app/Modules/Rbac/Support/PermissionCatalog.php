@@ -28,6 +28,9 @@ final class PermissionCatalog
             ['slug' => 'staff.view', 'group' => 'staff', 'name' => 'View staff'],
             ['slug' => 'staff.manage', 'group' => 'staff', 'name' => 'Manage staff'],
             ['slug' => 'analytics.view', 'group' => 'analytics', 'name' => 'View analytics'],
+            ['slug' => 'analytics.view_executive', 'group' => 'analytics', 'name' => 'View executive dashboard (both pipelines)'],
+            ['slug' => 'analytics.export', 'group' => 'analytics', 'name' => 'Export dashboard reports'],
+            ['slug' => 'audit.view', 'group' => 'rbac', 'name' => 'View audit logs'],
             ['slug' => 'settings.view', 'group' => 'settings', 'name' => 'View settings'],
             ['slug' => 'rbac.manage_permissions', 'group' => 'rbac', 'name' => 'Manage roles & permissions'],
             ['slug' => 'applications.view', 'group' => 'platform', 'name' => 'View job applications'],
@@ -47,7 +50,7 @@ final class PermissionCatalog
 
         return [
             'super_admin' => $all,
-            'admin' => array_values(array_filter($all, fn (string $s) => $s !== 'rbac.manage_permissions')),
+            'admin' => array_values(array_filter($all, fn (string $s) => ! in_array($s, ['rbac.manage_permissions', 'audit.view'], true))),
             'marketing' => [
                 'leads.view', 'leads.view_all', 'leads.create', 'leads.import', 'leads.export',
                 'leads.assign_manager', 'leads.reassign', 'leads.release', 'consultations.view',

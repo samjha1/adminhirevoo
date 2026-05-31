@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin\Leads;
 use App\Enums\AdminRole;
 use App\Enums\SalesTeam;
 use App\Enums\LeadSalesStatus;
+use App\Http\Controllers\Concerns\HandlesAssignmentFailures;
 use App\Http\Controllers\Controller;
 use App\Models\Admin;
 use App\Models\AdminLeadStage;
@@ -25,6 +26,8 @@ use Illuminate\View\View;
 
 class LeadController extends Controller
 {
+    use HandlesAssignmentFailures;
+
     public function __construct(
         private readonly CandidateInsightService $candidateInsightService,
         private readonly LeadPipelineService $leadPipeline,
@@ -148,7 +151,21 @@ class LeadController extends Controller
             'showAssigneeFilter' => $showAssigneeFilter,
             'assigneeFilterEmployees' => $this->talentTeamEmployees($admin),
             'pipeline' => SalesTeam::Candidate,
+            'canBulkManagers' => $admin->canPermission('leads.assign_manager'),
+            'canBulkEmployees' => $admin->canPermission('leads.assign_employee')
+                && $admin->role === AdminRole::SalesManager,
+            'bulkManagerActorLabel' => $this->bulkManagerActorLabel($admin),
         ]);
+    }
+
+    private function bulkManagerActorLabel(Admin $admin): string
+    {
+        return match ($admin->role) {
+            AdminRole::Marketing => 'Marketing',
+            AdminRole::SuperAdmin => 'Super Admin',
+            AdminRole::Admin => 'Admin',
+            default => $admin->role->label(),
+        };
     }
 
     /** @return \Illuminate\Database\Eloquent\Collection<int, Admin> */
@@ -336,9 +353,12 @@ class LeadController extends Controller
         ]);
 
         $manager = Admin::query()->findOrFail((int) $validated['manager_id']);
-        $this->assignmentService->assignToSalesManager($lead, $manager, auth('admin')->user());
+        $actor = auth('admin')->user();
 
-        return back()->with('success', 'Lead assigned to sales manager.');
+        return $this->assignmentRedirect(
+            fn () => $this->assignmentService->assignToSalesManager($lead, $manager, $actor),
+            'Lead assigned to sales manager.',
+        );
     }
 
     public function reassignManager(Request $request, HirevoLead $lead): RedirectResponse
@@ -350,17 +370,23 @@ class LeadController extends Controller
         ]);
 
         $manager = Admin::query()->findOrFail((int) $validated['manager_id']);
-        $this->assignmentService->reassignSalesManager($lead, $manager, auth('admin')->user());
+        $actor = auth('admin')->user();
 
-        return back()->with('success', 'Lead reassigned to another sales manager.');
+        return $this->assignmentRedirect(
+            fn () => $this->assignmentService->reassignSalesManager($lead, $manager, $actor),
+            'Lead reassigned to another sales manager.',
+        );
     }
 
     public function releaseToPool(HirevoLead $lead): RedirectResponse
     {
         $this->authorize('releaseToPool', $lead);
-        $this->assignmentService->releaseToPool($lead, auth('admin')->user());
+        $actor = auth('admin')->user();
 
-        return back()->with('success', 'Lead returned to the unassigned pool.');
+        return $this->assignmentRedirect(
+            fn () => $this->assignmentService->releaseToPool($lead, $actor),
+            'Lead returned to the unassigned pool.',
+        );
     }
 
     public function assignEmployee(Request $request, HirevoLead $lead): RedirectResponse
@@ -372,9 +398,12 @@ class LeadController extends Controller
         ]);
 
         $employee = Admin::query()->findOrFail((int) $validated['employee_id']);
-        $this->assignmentService->assignToEmployee($lead, $employee, auth('admin')->user());
+        $manager = auth('admin')->user();
 
-        return back()->with('success', 'Lead assigned to sales employee.');
+        return $this->assignmentRedirect(
+            fn () => $this->assignmentService->assignToEmployee($lead, $employee, $manager),
+            'Lead assigned to sales employee.',
+        );
     }
 
     public function reassignEmployee(Request $request, HirevoLead $lead): RedirectResponse
@@ -386,17 +415,23 @@ class LeadController extends Controller
         ]);
 
         $employee = Admin::query()->findOrFail((int) $validated['employee_id']);
-        $this->assignmentService->reassignEmployee($lead, $employee, auth('admin')->user());
+        $manager = auth('admin')->user();
 
-        return back()->with('success', 'Lead reassigned to another employee.');
+        return $this->assignmentRedirect(
+            fn () => $this->assignmentService->reassignEmployee($lead, $employee, $manager),
+            'Lead reassigned to another employee.',
+        );
     }
 
     public function takeBack(HirevoLead $lead): RedirectResponse
     {
         $this->authorize('takeBack', $lead);
-        $this->assignmentService->takeBackFromEmployee($lead, auth('admin')->user());
+        $actor = auth('admin')->user();
 
-        return back()->with('success', 'Lead taken back from employee.');
+        return $this->assignmentRedirect(
+            fn () => $this->assignmentService->takeBackFromEmployee($lead, $actor),
+            'Lead taken back from employee.',
+        );
     }
 
     public function showConsultation(HirevoCareerConsultationRequest $consultation): View

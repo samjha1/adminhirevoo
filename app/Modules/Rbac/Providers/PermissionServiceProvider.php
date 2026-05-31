@@ -19,6 +19,11 @@ class PermissionServiceProvider extends ServiceProvider
     {
         Gate::before(function (Admin $admin, string $ability) {
             if ($admin->role?->isSuperAdmin()) {
+                // Lead assignment policies enforce ownership and assignment state.
+                if (in_array($ability, ['takeBack', 'assignAsManager', 'assignAsMarketing'], true)) {
+                    return null;
+                }
+
                 return true;
             }
 

@@ -15,6 +15,7 @@ use App\Services\EmployerProspectVisibilityService;
 use App\Services\SalesTeamService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -31,7 +32,7 @@ class EmployerPipelineController extends Controller
 
     public function index(Request $request): View
     {
-        $this->sync->syncFromHirevo();
+        $this->syncIfStale();
         $admin = $request->user('admin');
         $query = $this->baseQuery($admin);
 
@@ -50,7 +51,7 @@ class EmployerPipelineController extends Controller
 
     public function kanban(Request $request): View
     {
-        $this->sync->syncFromHirevo();
+        $this->syncIfStale();
         $admin = $request->user('admin');
         $columns = [];
 
@@ -167,8 +168,9 @@ class EmployerPipelineController extends Controller
             'pipeline' => SalesTeam::Employer,
             'assignableManagers' => $this->assignableManagers(),
             'assignableEmployees' => $this->assignableEmployees($admin),
-            'canBulkManagers' => $admin->role?->hasUnrestrictedLeadVisibility() || $admin->role === AdminRole::Marketing,
-            'canBulkEmployees' => $admin->role === AdminRole::SalesManager
+            'canBulkManagers' => $admin->canPermission('leads.assign_manager'),
+            'canBulkEmployees' => $admin->canPermission('leads.assign_employee')
+                && $admin->role === AdminRole::SalesManager
                 && $this->teams->teamFor($admin) === SalesTeam::Employer,
             'stageLabels' => $stageLabels,
             'stageCounts' => $stageCounts,
@@ -214,13 +216,38 @@ class EmployerPipelineController extends Controller
     private function bulkRedirect(array $result, string $label): RedirectResponse
     {
         $redirect = back();
-        if ($result['success'] > 0) {
-            $redirect = $redirect->with('success', "Assigned {$result['success']} company(ies) to {$label}.");
+
+        if ($result['success'] === 0 && ($result['skipped'] ?? 0) === 0 && $result['errors'] !== []) {
+            return $redirect
+                ->with('error', 'No companies were updated. Check the list below or pick different rows.')
+                ->with('bulk_errors', $result['errors']);
         }
+
+        if ($result['success'] > 0 || ($result['skipped'] ?? 0) > 0) {
+            $msg = "Assigned {$result['success']} company(ies) to {$label}.";
+            if (($result['skipped'] ?? 0) > 0) {
+                $msg .= ' '.($result['skipped']).' skipped (already assigned as selected).';
+            }
+            $redirect = $redirect->with('success', $msg);
+        }
+
         if ($result['errors'] !== []) {
             $redirect = $redirect->with('bulk_errors', $result['errors']);
         }
 
         return $redirect;
+    }
+
+    private function syncIfStale(): void
+    {
+        $ttl = max(1, (int) config('crm.employer_prospect_sync_ttl_minutes', 5));
+        $key = 'crm.employer_prospect_sync';
+
+        if (Cache::has($key)) {
+            return;
+        }
+
+        $this->sync->syncFromHirevo();
+        Cache::put($key, 1, now()->addMinutes($ttl));
     }
 }

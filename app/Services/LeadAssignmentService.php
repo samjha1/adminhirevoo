@@ -71,8 +71,8 @@ class LeadAssignmentService
 
     public function assignToEmployee(HirevoLead $lead, Admin $employee, Admin $manager): HirevoLead
     {
-        if ($manager->role !== AdminRole::SalesManager) {
-            throw new InvalidArgumentException('Only a sales manager can assign to employees.');
+        if (! $manager->canPermission('leads.assign_employee')) {
+            throw new InvalidArgumentException('You do not have permission to assign leads to employees.');
         }
         $this->assertCandidateEmployee($employee, $manager);
         if ($lead->sales_manager_id !== $manager->id && $lead->assigned_to !== $manager->id) {
@@ -97,6 +97,9 @@ class LeadAssignmentService
 
     public function reassignEmployee(HirevoLead $lead, Admin $newEmployee, Admin $manager): HirevoLead
     {
+        if (! $manager->canPermission('leads.assign_employee')) {
+            throw new InvalidArgumentException('You do not have permission to assign leads to employees.');
+        }
         $this->assertCandidateEmployee($newEmployee, $manager);
         if ($lead->sales_manager_id !== $manager->id) {
             throw new InvalidArgumentException('Lead is not owned by this manager.');
@@ -117,31 +120,64 @@ class LeadAssignmentService
         });
     }
 
-    public function takeBackFromEmployee(HirevoLead $lead, Admin $manager): HirevoLead
+    public function takeBackFromEmployee(HirevoLead $lead, Admin $actor): HirevoLead
     {
-        if ($manager->role !== AdminRole::SalesManager) {
-            throw new InvalidArgumentException('Only a sales manager can take back a lead.');
-        }
-        if ($lead->sales_manager_id !== $manager->id) {
-            throw new InvalidArgumentException('Lead is not under this manager.');
+        if (! $actor->canPermission('leads.take_back')) {
+            throw new InvalidArgumentException('You do not have permission to take back leads.');
         }
         if ($lead->assignment_role_level !== AssignmentRoleLevel::Employee) {
-            throw new InvalidArgumentException('Lead is not assigned to an employee.');
+            throw new InvalidArgumentException('Lead is not assigned to an employee. It is already with a manager or unassigned.');
         }
 
-        return DB::transaction(function () use ($lead, $manager) {
+        $canActForAnyTeam = $actor->role?->isSuperAdmin() || $actor->canPermission('leads.view_all');
+
+        if ($canActForAnyTeam) {
+            $targetManager = $this->resolveTakeBackManager($lead);
+        } else {
+            if ((int) $lead->sales_manager_id !== (int) $actor->id) {
+                throw new InvalidArgumentException('Lead is not under this manager.');
+            }
+            $targetManager = $actor;
+        }
+
+        return DB::transaction(function () use ($lead, $actor, $targetManager) {
             $from = $lead->assigned_to;
-            $lead->assigned_to = $manager->id;
-            $lead->assigned_by = $manager->id;
+            $lead->assigned_to = $targetManager->id;
+            $lead->assigned_by = $actor->id;
+            $lead->sales_manager_id = $targetManager->id;
             $lead->assignment_role_level = AssignmentRoleLevel::Manager;
             $lead->assignment_status = LeadAssignmentStatus::Assigned;
             $lead->save();
 
-            $this->history($lead, $from, $manager->id, $manager->id, LeadAssignmentActionType::TakeBack);
-            $this->audit->log('lead.take_back', $manager, $lead, []);
+            $this->history($lead, $from, $targetManager->id, $actor->id, LeadAssignmentActionType::TakeBack);
+            $this->audit->log('lead.take_back', $actor, $lead, ['manager_id' => $targetManager->id]);
 
             return $lead->fresh();
         });
+    }
+
+    private function resolveTakeBackManager(HirevoLead $lead): Admin
+    {
+        $salesManagerId = (int) $lead->sales_manager_id;
+        if ($salesManagerId > 0) {
+            $manager = Admin::query()->find($salesManagerId);
+            if ($manager !== null) {
+                return $manager;
+            }
+        }
+
+        $assignedId = (int) $lead->assigned_to;
+        if ($assignedId > 0) {
+            $assignee = Admin::query()->find($assignedId);
+            if ($assignee !== null && (int) $assignee->manager_id > 0) {
+                $manager = Admin::query()->find((int) $assignee->manager_id);
+                if ($manager !== null) {
+                    return $manager;
+                }
+            }
+        }
+
+        throw new InvalidArgumentException('No sales manager is linked to this lead.');
     }
 
     /**

@@ -9,21 +9,25 @@ use App\Modules\Leads\Models\CrmCompanyMeeting;
 use App\Modules\Leads\Models\CrmCompanyClient;
 use App\Modules\Leads\Models\CrmCompanyProposal;
 use App\Modules\Leads\Models\CrmEmployerProspect;
+use App\Support\DashboardPeriod;
 use Illuminate\Support\Facades\Schema;
 
 class CompanyB2bDashboardService
 {
     public function __construct(
         private readonly EmployerProspectVisibilityService $visibility,
+        private readonly DashboardPipelineMetrics $pipelineMetrics,
     ) {
     }
 
-    public function metricsFor(Admin $admin): array
+    public function metricsFor(Admin $admin, ?DashboardPeriod $period = null): array
     {
+        $period ??= DashboardPeriod::forPreset('this_month');
         $base = CrmEmployerProspect::query();
         $this->visibility->restrictVisible($base, $admin);
 
         $today = now()->toDateString();
+        $summary = $this->pipelineMetrics->companySummary($base, $period);
 
         $callsToday = 0;
         if (Schema::hasTable('crm_call_logs') && Schema::hasColumn('crm_call_logs', 'employer_prospect_id')) {
@@ -73,14 +77,18 @@ class CompanyB2bDashboardService
             ->pluck('aggregate', 'pipeline_stage')
             ->toArray();
 
-        $activeClients = Schema::hasTable('crm_company_clients')
-            ? CrmCompanyClient::query()->count()
+        $prospectIds = (clone $base)->pluck('id');
+        $activeClients = Schema::hasTable('crm_company_clients') && $prospectIds->isNotEmpty()
+            ? CrmCompanyClient::query()->whereIn('employer_prospect_id', $prospectIds)->count()
             : (clone $base)->whereIn('pipeline_stage', [
                 CompanyB2bPipelineStage::HiringActive->value,
                 CompanyB2bPipelineStage::Renewed->value,
             ])->count();
 
         return [
+            'role' => $admin->role,
+            'period' => $period,
+            'summary' => $summary,
             'callsToday' => $callsToday,
             'meetingsToday' => $meetingsToday,
             'proposalsSent' => $proposalsSent,

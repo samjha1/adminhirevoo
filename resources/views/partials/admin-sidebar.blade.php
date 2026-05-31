@@ -77,6 +77,12 @@
             </a>
             @endif
 
+            @if($can('audit.view'))
+            <a class="nav-link @if(request()->routeIs('admin.settings.audit-logs')) active @endif"
+               href="{{ route('admin.settings.audit-logs') }}">
+                <i class="bi bi-journal-text me-2"></i>Audit logs
+            </a>
+            @endif
             @if($can('rbac.manage_permissions'))
             <a class="nav-link @if(request()->routeIs('admin.settings.rbac')) active @endif"
                href="{{ route('admin.settings.rbac') }}">

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\DashboardApiController;
 use App\Http\Controllers\Api\V1\ConsultationApiController;
 use App\Http\Controllers\Api\V1\LeadApiController;
 use App\Http\Controllers\Api\V1\LeadCallApiController;
@@ -16,6 +17,21 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me/permissions', MePermissionsController::class);
+
+        Route::prefix('dashboard')->middleware('permission:analytics.view')->group(function () {
+            Route::get('/summary', [DashboardApiController::class, 'summary']);
+            Route::get('/revenue', [DashboardApiController::class, 'revenue']);
+            Route::get('/leads', [DashboardApiController::class, 'leads']);
+            Route::get('/funnel', [DashboardApiController::class, 'funnel']);
+            Route::get('/team-performance', [DashboardApiController::class, 'teamPerformance']);
+            Route::get('/manager-performance', [DashboardApiController::class, 'managerPerformance']);
+            Route::get('/employee-performance', [DashboardApiController::class, 'employeePerformance']);
+            Route::get('/recent-activities', [DashboardApiController::class, 'recentActivities']);
+            Route::get('/export/excel', [DashboardApiController::class, 'exportExcel'])
+                ->middleware('permission:analytics.export');
+            Route::get('/export/pdf', [DashboardApiController::class, 'exportPdf'])
+                ->middleware('permission:analytics.export');
+        });
 
         Route::get('/users', [StaffUserController::class, 'index'])
             ->middleware('permission:staff.view|staff.manage');

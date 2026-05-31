@@ -286,7 +286,7 @@ class AdminStaffController extends Controller
     {
         $actor = auth('admin')->user();
 
-        if ($actor->role === AdminRole::Admin) {
+        if ($actor->role === AdminRole::Admin || $actor->role === AdminRole::SuperAdmin) {
             return;
         }
 

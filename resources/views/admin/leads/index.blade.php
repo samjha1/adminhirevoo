@@ -190,12 +190,12 @@
 @section('content')
     @php
         $me = auth('admin')->user();
-        $canSeeConsultations = $me->hasAnyRole([\App\Enums\AdminRole::Admin, \App\Enums\AdminRole::Marketing]);
+        $canSeeConsultations = $me->canPermission('consultations.view');
         $activeTab = ($activeTab ?? 'leads') === 'consultations' ? 'consultations' : 'leads';
         $listRoute = $activeTab === 'consultations' ? route('admin.consultations.index') : route('admin.leads.index');
-        $canBulkManagers = $me->hasAnyRole([\App\Enums\AdminRole::Admin, \App\Enums\AdminRole::Marketing]);
-        $canBulkEmployees = $me->role === \App\Enums\AdminRole::SalesManager;
-        $isMarketing = $me->role === \App\Enums\AdminRole::Marketing;
+        $canBulkManagers = $canBulkManagers ?? $me->canPermission('leads.assign_manager');
+        $canBulkEmployees = $canBulkEmployees ?? ($me->canPermission('leads.assign_employee') && $me->role === \App\Enums\AdminRole::SalesManager);
+        $bulkManagerActorLabel = $bulkManagerActorLabel ?? 'Admin';
         $hasFilters = request()->filled('q') || request()->filled('status') || request()->filled('assignment_status')
             || request()->filled('mgmt_stage') || request()->filled('assignee_id');
         $filterBase = request()->except(['leads_page', 'mgmt_stage']);
@@ -287,6 +287,19 @@
                     @if(request('status'))
                         <a class="leads-filter-chip" href="{{ route('admin.leads.index', request()->except(['status', 'leads_page'])) }}">
                             Product: {{ str_replace('_', ' ', request('status')) }} <i class="bi bi-x-lg"></i>
+                        </a>
+                    @endif
+                    @if(request('assignee_id'))
+                        @php
+                            $assigneeChip = match (request('assignee_id')) {
+                                'unassigned', '0' => 'Unassigned',
+                                default => $assignableManagers->firstWhere('id', (int) request('assignee_id'))?->name
+                                    ?? $assigneeFilterEmployees->firstWhere('id', (int) request('assignee_id'))?->name
+                                    ?? 'Owner #'.request('assignee_id'),
+                            };
+                        @endphp
+                        <a class="leads-filter-chip" href="{{ route('admin.leads.index', request()->except(['assignee_id', 'leads_page'])) }}">
+                            Owner: {{ $assigneeChip }} <i class="bi bi-x-lg"></i>
                         </a>
                     @endif
                     <a href="{{ route('admin.leads.index') }}" class="leads-filter-chip text-secondary border-secondary-subtle bg-white">
@@ -381,9 +394,9 @@
                             <div class="d-flex gap-3 align-items-start">
                                 <div class="bulk-icon"><i class="bi bi-diagram-3"></i></div>
                                 <div>
-                                    <div class="bulk-kicker">@if($isMarketing) Marketing @else Admin @endif</div>
-                                    <div class="bulk-title">Assign to sales manager</div>
-                                    <p class="small text-muted mb-0" id="bulk-m-countline">No leads selected.</p>
+                                    <div class="bulk-kicker">{{ $bulkManagerActorLabel }}</div>
+                                    <div class="bulk-title">Bulk assign to sales manager</div>
+                                    <p class="small text-muted mb-0" id="bulk-m-countline">Select leads below, then choose a talent team manager.</p>
                                 </div>
                             </div>
                             <div class="d-flex flex-wrap gap-2 align-items-end">
@@ -411,8 +424,8 @@
                                 <div class="bulk-icon"><i class="bi bi-person-lines-fill"></i></div>
                                 <div>
                                     <div class="bulk-kicker">Sales manager</div>
-                                    <div class="bulk-title">Assign to your team</div>
-                                    <p class="small text-muted mb-0" id="bulk-e-countline">No leads selected.</p>
+                                    <div class="bulk-title">Bulk assign to your executives</div>
+                                    <p class="small text-muted mb-0" id="bulk-e-countline">Select leads you own, then pick a team member.</p>
                                 </div>
                             </div>
                             <div class="d-flex flex-wrap gap-2 align-items-end">
@@ -546,16 +559,20 @@
                         const cbs = document.querySelectorAll('.lead-bulk-cb');
                         const all = document.getElementById('lead-select-all');
                         function count() { return document.querySelectorAll('.lead-bulk-cb:checked').length; }
-                        function formatCountLine(n) {
-                            if (n === 0) return 'No leads selected.';
-                            return '<strong>' + n + '</strong> ' + (n === 1 ? 'lead' : 'leads') + ' selected';
-                        }
                         function refresh() {
                             const n = count();
-                            ['bulk-m-countline', 'bulk-e-countline'].forEach(id => {
-                                const el = document.getElementById(id);
-                                if (el) el.innerHTML = formatCountLine(n);
-                            });
+                            const mLine = document.getElementById('bulk-m-countline');
+                            const eLine = document.getElementById('bulk-e-countline');
+                            if (mLine) {
+                                mLine.innerHTML = n === 0
+                                    ? 'Select leads below, then choose a talent team manager.'
+                                    : '<strong>' + n + '</strong> lead' + (n === 1 ? '' : 's') + ' selected — choose manager and click Assign.';
+                            }
+                            if (eLine) {
+                                eLine.innerHTML = n === 0
+                                    ? 'Select leads you own, then pick a team member.'
+                                    : '<strong>' + n + '</strong> lead' + (n === 1 ? '' : 's') + ' selected — choose executive and click Assign.';
+                            }
                             ['bulk-bar-managers', 'bulk-bar-employees'].forEach(id => {
                                 document.getElementById(id)?.classList.toggle('is-idle', n === 0);
                             });
@@ -583,12 +600,16 @@
                             const sel = document.getElementById('bulk-manager-select');
                             const ids = [...document.querySelectorAll('.lead-bulk-cb:checked')].map(c => c.value);
                             if (!ids.length || !sel?.value) return;
+                            const label = sel.options[sel.selectedIndex]?.text || 'the selected manager';
+                            if (!confirm('Assign ' + ids.length + ' lead(s) to ' + label + '?')) return;
                             fillAndSubmit('form-bulk-managers', ids, 'manager_id', sel.value);
                         });
                         document.getElementById('bulk-e-submit')?.addEventListener('click', function () {
                             const sel = document.getElementById('bulk-employee-select');
                             const ids = [...document.querySelectorAll('.lead-bulk-cb:checked')].map(c => c.value);
                             if (!ids.length || !sel?.value) return;
+                            const label = sel.options[sel.selectedIndex]?.text || 'the selected executive';
+                            if (!confirm('Assign ' + ids.length + ' lead(s) to ' + label + '?')) return;
                             fillAndSubmit('form-bulk-employees', ids, 'employee_id', sel.value);
                         });
                         refresh();

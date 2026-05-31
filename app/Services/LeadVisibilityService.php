@@ -5,14 +5,20 @@ namespace App\Services;
 use App\Enums\AdminRole;
 use App\Models\Admin;
 use App\Models\Hirevo\HirevoLead;
+use App\Modules\Rbac\Services\PermissionResolver;
 use Illuminate\Database\Eloquent\Builder;
 
 class LeadVisibilityService
 {
+    public function __construct(
+        private readonly PermissionResolver $permissions,
+    ) {
+    }
+
     /** @param  Builder<HirevoLead>  $query */
     public function restrictVisibleLeads(Builder $query, Admin $admin): void
     {
-        if ($admin->role->hasUnrestrictedLeadVisibility()) {
+        if ($admin->role->hasUnrestrictedLeadVisibility() || $this->permissions->can($admin, 'leads.view_all')) {
             return;
         }
 
@@ -28,7 +34,7 @@ class LeadVisibilityService
 
     public function canViewLead(Admin $admin, HirevoLead $lead): bool
     {
-        if ($admin->role->hasUnrestrictedLeadVisibility()) {
+        if ($admin->role->hasUnrestrictedLeadVisibility() || $this->permissions->can($admin, 'leads.view_all')) {
             return true;
         }
 
