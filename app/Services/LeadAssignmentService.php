@@ -25,8 +25,8 @@ class LeadAssignmentService
 
     public function assignToSalesManager(HirevoLead $lead, Admin $manager, Admin $actor): HirevoLead
     {
-        if (! $actor->hasAnyRole([AdminRole::Admin, AdminRole::Marketing])) {
-            throw new InvalidArgumentException('Only admin or marketing can assign to a sales manager.');
+        if (! $actor->canPermission('leads.assign_manager')) {
+            throw new InvalidArgumentException('You do not have permission to assign leads to a sales manager.');
         }
         $this->assertCandidateManager($manager);
 
@@ -48,8 +48,8 @@ class LeadAssignmentService
 
     public function reassignSalesManager(HirevoLead $lead, Admin $newManager, Admin $actor): HirevoLead
     {
-        if (! $actor->hasAnyRole([AdminRole::Admin, AdminRole::Marketing])) {
-            throw new InvalidArgumentException('Only admin or marketing can reassign managers.');
+        if (! $actor->canPermission('leads.assign_manager')) {
+            throw new InvalidArgumentException('You do not have permission to reassign sales managers.');
         }
         $this->assertCandidateManager($newManager);
 
@@ -272,8 +272,8 @@ class LeadAssignmentService
     /** Release lead to global pool (marketing / admin). */
     public function releaseToPool(HirevoLead $lead, Admin $actor): HirevoLead
     {
-        if (! $actor->hasAnyRole([AdminRole::Admin, AdminRole::Marketing])) {
-            throw new InvalidArgumentException('Only admin or marketing can release leads to the pool.');
+        if (! $actor->canPermission('leads.release')) {
+            throw new InvalidArgumentException('You do not have permission to release leads to the pool.');
         }
 
         return DB::transaction(function () use ($lead, $actor) {

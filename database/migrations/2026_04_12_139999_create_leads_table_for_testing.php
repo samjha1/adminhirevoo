@@ -18,10 +18,14 @@ return new class extends Migration
         Schema::create('leads', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('candidate_id')->nullable();
-            $table->string('status', 32)->default('new');
+            $table->unsignedBigInteger('employer_job_id')->nullable();
+            $table->unsignedBigInteger('upskill_opportunity_id')->nullable();
+            $table->string('status', 32)->default('available');
             $table->unsignedTinyInteger('match_percentage')->nullable();
             $table->unsignedTinyInteger('intent_score')->nullable();
             $table->json('missing_skills')->nullable();
+            $table->string('referral_source', 100)->nullable();
+            $table->string('lead_summary', 64)->nullable();
             $table->timestamps();
         });
     }

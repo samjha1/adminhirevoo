@@ -36,9 +36,14 @@ class AdminStaffController extends Controller
             });
         }
 
+        if ($request->filled('sales_team')) {
+            $q->where('sales_team', $request->string('sales_team')->toString());
+        }
+
         return view('admin.staff.index', [
             'staff' => $q->paginate(20)->withQueryString(),
             'roles' => AdminRole::cases(),
+            'salesTeams' => SalesTeam::cases(),
             'managerCreatesEmployeesOnly' => $actor->role === AdminRole::SalesManager,
         ]);
     }
@@ -50,8 +55,10 @@ class AdminStaffController extends Controller
 
         return view('admin.staff.create', [
             'roles' => $managerOnly ? [AdminRole::SalesEmployee] : AdminRole::cases(),
-            'managers' => $managerOnly ? collect() : Admin::query()->where('role', AdminRole::SalesManager)->orderBy('name')->get(),
+            'managers' => $managerOnly ? collect() : $this->salesManagers(),
+            'salesTeams' => SalesTeam::cases(),
             'managerCreatesEmployeesOnly' => $managerOnly,
+            'lockedTeam' => $managerOnly ? ($actor->sales_team ?? SalesTeam::Candidate) : null,
         ]);
     }
 
@@ -83,18 +90,23 @@ class AdminStaffController extends Controller
             'email' => ['required', 'email', 'max:255', 'unique:admins,email'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'role' => ['required', Rule::enum(AdminRole::class)],
-            'sales_team' => ['nullable', Rule::enum(SalesTeam::class)],
+            'sales_team' => [
+                Rule::requiredIf(fn () => in_array($request->input('role'), [
+                    AdminRole::SalesManager->value,
+                    AdminRole::SalesEmployee->value,
+                ], true)),
+                'nullable',
+                Rule::enum(SalesTeam::class),
+            ],
             'manager_id' => ['nullable', 'exists:admins,id'],
         ]);
 
-        if ($validated['role'] === AdminRole::SalesEmployee->value && empty($validated['manager_id'])) {
-            return back()->withErrors(['manager_id' => 'Sales employees must report to a manager.'])->withInput();
-        }
-
         $role = AdminRole::from($validated['role']);
-        $team = isset($validated['sales_team'])
-            ? SalesTeam::from($validated['sales_team'])
-            : $this->defaultTeamForRole($role);
+        $team = $this->resolveTeamForRole($role, $validated['sales_team'] ?? null);
+
+        if ($teamError = $this->validateTeamAndManager($role, $team, isset($validated['manager_id']) ? (int) $validated['manager_id'] : null)) {
+            return back()->withErrors($teamError)->withInput();
+        }
 
         $this->createStaff([
             'name' => $validated['name'],
@@ -133,6 +145,54 @@ class AdminStaffController extends Controller
         };
     }
 
+    private function resolveTeamForRole(AdminRole $role, ?string $teamValue): ?SalesTeam
+    {
+        if (! in_array($role, [AdminRole::SalesManager, AdminRole::SalesEmployee], true)) {
+            return null;
+        }
+
+        if ($teamValue) {
+            return SalesTeam::from($teamValue);
+        }
+
+        return $this->defaultTeamForRole($role);
+    }
+
+    /** @return array<string, string> */
+    private function validateTeamAndManager(AdminRole $role, ?SalesTeam $team, ?int $managerId): array
+    {
+        $errors = [];
+
+        if (in_array($role, [AdminRole::SalesManager, AdminRole::SalesEmployee], true) && $team === null) {
+            $errors['sales_team'] = 'Choose Talent or Company team for sales roles.';
+        }
+
+        if ($role === AdminRole::SalesEmployee && empty($managerId)) {
+            $errors['manager_id'] = 'Sales employees must report to a manager.';
+        }
+
+        if ($managerId && $team) {
+            $manager = Admin::query()->find($managerId);
+            if ($manager && $manager->role === AdminRole::SalesManager) {
+                $managerTeam = $manager->sales_team ?? SalesTeam::Candidate->value;
+                if ($managerTeam !== $team->value) {
+                    $errors['manager_id'] = 'Manager must be on the same sales team ('.$team->shortLabel().').';
+                }
+            }
+        }
+
+        return $errors;
+    }
+
+    /** @return \Illuminate\Database\Eloquent\Collection<int, Admin> */
+    private function salesManagers(): \Illuminate\Database\Eloquent\Collection
+    {
+        return Admin::query()
+            ->where('role', AdminRole::SalesManager)
+            ->orderBy('name')
+            ->get();
+    }
+
     public function edit(Admin $staff): View
     {
         $this->assertManagerCanManageStaff($staff);
@@ -143,8 +203,10 @@ class AdminStaffController extends Controller
         return view('admin.staff.edit', [
             'staff' => $staff,
             'roles' => $managerOnly ? [AdminRole::SalesEmployee] : AdminRole::cases(),
-            'managers' => $managerOnly ? collect() : Admin::query()->where('role', AdminRole::SalesManager)->orderBy('name')->get(),
+            'managers' => $managerOnly ? collect() : $this->salesManagers(),
+            'salesTeams' => SalesTeam::cases(),
             'managerCreatesEmployeesOnly' => $managerOnly,
+            'lockedTeam' => $managerOnly ? ($actor->sales_team ?? SalesTeam::Candidate) : null,
         ]);
     }
 
@@ -176,17 +238,28 @@ class AdminStaffController extends Controller
             'email' => ['required', 'email', 'max:255', Rule::unique('admins', 'email')->ignore($staff->id)],
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
             'role' => ['required', Rule::enum(AdminRole::class)],
-            'sales_team' => ['nullable', Rule::enum(SalesTeam::class)],
+            'sales_team' => [
+                Rule::requiredIf(fn () => in_array($request->input('role'), [
+                    AdminRole::SalesManager->value,
+                    AdminRole::SalesEmployee->value,
+                ], true)),
+                'nullable',
+                Rule::enum(SalesTeam::class),
+            ],
             'manager_id' => ['nullable', 'exists:admins,id'],
         ]);
 
-        if ($validated['role'] === AdminRole::SalesEmployee->value && empty($validated['manager_id'])) {
-            return back()->withErrors(['manager_id' => 'Sales employees must report to a manager.'])->withInput();
+        $role = AdminRole::from($validated['role']);
+        $team = $this->resolveTeamForRole($role, $validated['sales_team'] ?? null);
+
+        if ($teamError = $this->validateTeamAndManager($role, $team, isset($validated['manager_id']) ? (int) $validated['manager_id'] : null)) {
+            return back()->withErrors($teamError)->withInput();
         }
 
         $staff->name = $validated['name'];
         $staff->email = $validated['email'];
-        $staff->role = AdminRole::from($validated['role']);
+        $staff->role = $role;
+        $staff->sales_team = $team?->value;
         $staff->manager_id = $validated['manager_id'] ?? null;
         if (! empty($validated['password'])) {
             $staff->password = Hash::make($validated['password']);

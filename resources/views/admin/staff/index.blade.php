@@ -31,6 +31,14 @@
                 @endforeach
             </select>
         </div>
+        <div class="col-auto">
+            <select name="sales_team" class="form-select">
+                <option value="">All teams</option>
+                @foreach($salesTeams as $team)
+                    <option value="{{ $team->value }}" @selected(request('sales_team') === $team->value)>{{ $team->shortLabel() }}</option>
+                @endforeach
+            </select>
+        </div>
         @endif
         <div class="col-auto">
             <button type="submit" class="btn btn-outline-secondary">Filter</button>
@@ -46,6 +54,7 @@
                     <th>Email</th>
                     @if(!$mgrOnly)
                     <th>Role</th>
+                    <th>Team</th>
                     @endif
                     <th>Manager</th>
                     <th>Created</th>
@@ -59,6 +68,13 @@
                         <td>{{ $user->email }}</td>
                         @if(!$mgrOnly)
                         <td><span class="badge text-bg-primary">{{ $user->role->label() }}</span></td>
+                        <td>
+                            @if($user->sales_team)
+                                <span class="badge text-bg-light border">{{ $user->sales_team->shortLabel() }}</span>
+                            @else
+                                <span class="text-muted">—</span>
+                            @endif
+                        </td>
                         @endif
                         <td>{{ $user->manager?->name ?? '—' }}</td>
                         <td class="text-muted small">{{ $user->created_at?->format('Y-m-d') }}</td>

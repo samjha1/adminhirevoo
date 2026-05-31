@@ -70,6 +70,40 @@
         .crm-pipeline-title { font-size: 1.35rem; font-weight: 800; letter-spacing: -.02em; color: #0f172a; }
         .crm-pipeline-sub { font-size: .875rem; color: #64748b; margin-top: .25rem; }
         .crm-pipeline-switch .btn { border-radius: 999px !important; font-weight: 600; }
+        .crm-table-footer {
+            display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+            gap: 12px; padding: 12px 1.25rem; border-top: 1px solid #f1f5f9; background: #fafbfc;
+        }
+        .crm-table-footer-meta { font-size: .875rem; color: #64748b; line-height: 1.4; }
+        .crm-table-footer-meta strong { color: #0f172a; font-weight: 700; }
+        .crm-table-footer-pages {
+            display: flex; align-items: center; justify-content: flex-end;
+            gap: 10px; flex-wrap: wrap; margin-left: auto;
+        }
+        .crm-page-badge {
+            font-size: .78rem; font-weight: 600; color: #64748b; white-space: nowrap;
+            background: #fff; border: 1px solid #e2e8f0; border-radius: 999px; padding: .3rem .7rem;
+        }
+        .crm-pagination {
+            display: inline-flex; align-items: center; gap: 5px; margin: 0; padding: 0; list-style: none;
+        }
+        .crm-pagination li { margin: 0; padding: 0; }
+        .crm-pagination a, .crm-pagination span {
+            min-width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
+            border-radius: 8px; border: 1px solid #e2e8f0; font-size: .85rem; color: #334155;
+            background: #fff; text-decoration: none; padding: 0 .5rem; box-sizing: border-box;
+        }
+        .crm-pagination a:hover { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
+        .crm-pagination .is-active span { background: #2563eb; border-color: #2563eb; color: #fff; font-weight: 700; }
+        .crm-pagination .is-disabled span { opacity: .4; background: #f8fafc; cursor: default; }
+        .company-page .crm-pagination a:hover { background: #ecfdf5; border-color: #6ee7b7; color: #047857; }
+        .company-page .crm-pagination .is-active span { background: #059669; border-color: #059669; }
+        @media (max-width: 640px) {
+            .crm-table-footer { flex-direction: column; align-items: stretch; text-align: center; }
+            .crm-table-footer-pages {
+                margin-left: 0; justify-content: center; flex-direction: column; gap: 8px;
+            }
+        }
         .crm-bulk-card { border-radius: 14px; border: 1px solid rgba(37,99,235,.15); }
         .crm-table thead th { background: #f8fafc; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: #64748b; }
         .crm-stat-card { border-radius: 14px; border: 1px solid rgba(15,23,42,.06); }
@@ -155,6 +189,7 @@
         </main>
     </div>
 </div>
+@stack('scripts')
 </body>
 </html>
 

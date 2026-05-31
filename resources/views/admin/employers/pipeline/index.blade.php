@@ -4,7 +4,7 @@
 
 @push('styles')
 <style>
-    .company-page { max-width: 1440px; margin: 0 auto; }
+    .company-page { max-width: 1440px; margin: 0 auto; width: 100%; }
     .company-toolbar {
         display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
         gap: .75rem; margin-bottom: 1rem;
@@ -85,6 +85,7 @@
         background: #fff; overflow: hidden;
         box-shadow: 0 8px 30px rgba(15, 23, 42, .06);
     }
+    .company-table-card .table-responsive { margin: 0; }
     .company-table-head {
         padding: .85rem 1.25rem; border-bottom: 1px solid #f1f5f9;
         display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem;

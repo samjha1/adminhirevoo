@@ -25,6 +25,18 @@ class SalesTeamAssignmentTest extends TestCase
         $this->seed(AdminRbacSeeder::class);
     }
 
+    public function test_super_admin_can_assign_talent_lead_to_talent_manager(): void
+    {
+        $superAdmin = Admin::query()->where('email', 'superadmin@themesdesign.test')->firstOrFail();
+        $talentManager = Admin::query()->where('email', 'talent.manager@themesdesign.test')->firstOrFail();
+        $lead = HirevoLead::query()->create(['candidate_id' => 1, 'status' => 'new']);
+
+        $updated = app(LeadAssignmentService::class)->assignToSalesManager($lead, $talentManager, $superAdmin);
+
+        $this->assertSame($talentManager->id, $updated->sales_manager_id);
+        $this->assertSame($superAdmin->id, $updated->assigned_by);
+    }
+
     public function test_talent_lead_cannot_assign_to_company_manager(): void
     {
         $marketing = Admin::query()->where('email', 'marketing@themesdesign.test')->firstOrFail();

@@ -168,28 +168,6 @@
         background: #f1f5f9; color: #94a3b8;
         display: flex; align-items: center; justify-content: center; font-size: 1.5rem;
     }
-    .crm-table-footer {
-        display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
-        gap: 12px; padding: 12px 1.25rem; border-top: 1px solid #f1f5f9; background: #fafbfc;
-    }
-    .crm-table-footer-meta { font-size: .875rem; color: #64748b; }
-    .crm-table-footer-meta strong { color: #0f172a; font-weight: 700; }
-    .crm-table-footer-pages { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-    .crm-page-badge {
-        font-size: .78rem; font-weight: 600; color: #64748b;
-        background: #fff; border: 1px solid #e2e8f0; border-radius: 999px; padding: .3rem .7rem;
-    }
-    .crm-pagination {
-        display: inline-flex; align-items: center; gap: 5px; margin: 0; padding: 0; list-style: none;
-    }
-    .crm-pagination a, .crm-pagination span {
-        min-width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
-        border-radius: 8px; border: 1px solid #e2e8f0; font-size: .85rem; color: #334155;
-        background: #fff; text-decoration: none; padding: 0 .5rem;
-    }
-    .crm-pagination a:hover { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
-    .crm-pagination .is-active span { background: #2563eb; border-color: #2563eb; color: #fff; font-weight: 700; }
-    .crm-pagination .is-disabled span { opacity: .4; background: #f8fafc; }
     @media (max-width: 768px) {
         .leads-table thead { display: none; }
         .leads-table tbody tr {
@@ -504,6 +482,13 @@
                                             <div class="lead-email" title="{{ $lead->candidate?->email }}">{{ $lead->candidate?->email ?? '—' }}</div>
                                             @if($lead->candidate?->phone)
                                                 <div class="lead-phone">{{ $lead->candidate->phone }}</div>
+                                            @endif
+                                            @if($lead->referral_source || $lead->lead_summary)
+                                                <div class="lead-phone mt-1">
+                                                    <i class="bi bi-signpost-split me-1"></i>{{ str_replace('_', ' ', $lead->referral_source ?? $lead->lead_summary) }}
+                                                </div>
+                                            @elseif(! $lead->candidate)
+                                                <div class="lead-phone mt-1 text-warning">Guest / no profile linked</div>
                                             @endif
                                         </div>
                                     </div>

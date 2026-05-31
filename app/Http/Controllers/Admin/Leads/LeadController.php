@@ -86,10 +86,14 @@ class LeadController extends Controller
 
         if ($request->filled('q')) {
             $q = $request->string('q')->toString();
-            $leadQuery->whereHas('candidate', function ($cq) use ($q) {
-                $cq->where('name', 'like', "%{$q}%")
-                    ->orWhere('email', 'like', "%{$q}%")
-                    ->orWhere('phone', 'like', "%{$q}%");
+            $leadQuery->where(function ($outer) use ($q) {
+                $outer->whereHas('candidate', function ($cq) use ($q) {
+                    $cq->where('name', 'like', "%{$q}%")
+                        ->orWhere('email', 'like', "%{$q}%")
+                        ->orWhere('phone', 'like', "%{$q}%");
+                })
+                    ->orWhere('referral_source', 'like', "%{$q}%")
+                    ->orWhere('lead_summary', 'like', "%{$q}%");
             });
         }
 
