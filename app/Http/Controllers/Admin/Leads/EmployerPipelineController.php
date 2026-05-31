@@ -169,9 +169,11 @@ class EmployerPipelineController extends Controller
             'assignableManagers' => $this->assignableManagers(),
             'assignableEmployees' => $this->assignableEmployees($admin),
             'canBulkManagers' => $admin->canPermission('leads.assign_manager'),
-            'canBulkEmployees' => $admin->canPermission('leads.assign_employee')
+            'canBulkEmployees' => (
+                $admin->canPermission('leads.assign_employee')
                 && $admin->role === AdminRole::SalesManager
-                && $this->teams->teamFor($admin) === SalesTeam::Employer,
+                && $this->teams->teamFor($admin) === SalesTeam::Employer
+            ),
             'stageLabels' => $stageLabels,
             'stageCounts' => $stageCounts,
             'pipelineStages' => CompanyB2bPipelineStage::ordered(),
