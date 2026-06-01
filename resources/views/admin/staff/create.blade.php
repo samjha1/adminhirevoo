@@ -26,6 +26,7 @@
 
     <div class="card shadow-soft staff-form-card">
         <div class="card-body">
+            @include('admin.partials._validation-alert')
             <form method="POST" action="{{ route('admin.staff.store') }}">
                 @csrf
                 @include('admin.staff._form')

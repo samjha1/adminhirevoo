@@ -8,9 +8,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Admin;
 use App\Modules\Rbac\Models\CrmRole;
 use App\Services\AdminReferralCodeService;
+use App\Modules\Rbac\Services\PermissionResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -68,25 +68,26 @@ class AdminStaffController extends Controller
         $actor = auth('admin')->user();
 
         if ($actor->role === AdminRole::SalesManager) {
-            $validated = $request->validate([
+            $validated = $request->validate(array_merge([
                 'name' => ['required', 'string', 'max:255'],
                 'email' => ['required', 'email', 'max:255', 'unique:admins,email'],
                 'password' => ['required', 'string', 'min:8', 'confirmed'],
-            ]);
+            ], $this->referralCodeRules($request)));
 
-            $this->createStaff([
+            $admin = $this->createStaff([
                 'name' => $validated['name'],
                 'email' => $validated['email'],
-                'password' => Hash::make($validated['password']),
+                'password' => $validated['password'],
                 'role' => AdminRole::SalesEmployee,
                 'sales_team' => $actor->sales_team ?? SalesTeam::Candidate,
                 'manager_id' => $actor->id,
+                'referral_code' => $validated['referral_code'] ?? null,
             ]);
 
-            return redirect()->route('admin.staff.index')->with('success', 'Sales employee account created.');
+            return $this->redirectAfterStaffCreated($admin, 'Sales employee account created.');
         }
 
-        $validated = $request->validate([
+        $validated = $request->validate(array_merge([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:admins,email'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
@@ -100,7 +101,7 @@ class AdminStaffController extends Controller
                 Rule::enum(SalesTeam::class),
             ],
             'manager_id' => ['nullable', 'exists:admins,id'],
-        ]);
+        ], $this->referralCodeRules($request)));
 
         $role = AdminRole::from($validated['role']);
         $team = $this->resolveTeamForRole($role, $validated['sales_team'] ?? null);
@@ -109,19 +110,47 @@ class AdminStaffController extends Controller
             return back()->withErrors($teamError)->withInput();
         }
 
-        $this->createStaff([
+        $admin = $this->createStaff([
             'name' => $validated['name'],
             'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
+            'password' => $validated['password'],
             'role' => $role,
             'sales_team' => $team,
             'manager_id' => $validated['manager_id'] ?? null,
+            'referral_code' => $validated['referral_code'] ?? null,
         ]);
 
-        return redirect()->route('admin.staff.index')->with('success', 'Staff user created.');
+        return $this->redirectAfterStaffCreated($admin, 'Staff user created.');
     }
 
-    /** @param  array{name: string, email: string, password: string, role: AdminRole, sales_team?: ?SalesTeam, manager_id: ?int}  $data */
+    /** @return array<string, array<int, mixed>> */
+    private function referralCodeRules(Request $request): array
+    {
+        $rules = ['nullable', 'string', 'max:50'];
+
+        if ($request->filled('referral_code')) {
+            $rules[] = 'regex:/^[A-Za-z0-9\-]+$/';
+            $rules[] = Rule::unique('admins', 'referral_code');
+        }
+
+        return ['referral_code' => $rules];
+    }
+
+    private function redirectAfterStaffCreated(Admin $admin, string $message): RedirectResponse
+    {
+        if ($admin->referral_code) {
+            $message .= ' Referral code: '.$admin->referral_code;
+        }
+
+        $actor = auth('admin')->user();
+        $url = app(PermissionResolver::class)->can($actor, 'analytics.view')
+            ? route('admin.dashboard')
+            : route('admin.staff.index');
+
+        return redirect($url)->with('success', $message);
+    }
+
+    /** @param  array{name: string, email: string, password: string, role: AdminRole, sales_team?: ?SalesTeam, manager_id: ?int, referral_code?: ?string}  $data */
     private function createStaff(array $data): Admin
     {
         $crmRole = CrmRole::query()->where('slug', $data['role']->crmRoleSlug())->first();
@@ -137,9 +166,9 @@ class AdminStaffController extends Controller
             'manager_id' => $data['manager_id'],
         ]);
 
-        app(AdminReferralCodeService::class)->ensureCode($admin);
+        app(AdminReferralCodeService::class)->assignCode($admin, $data['referral_code'] ?? null);
 
-        return $admin;
+        return $admin->fresh();
     }
 
     private function defaultTeamForRole(AdminRole $role): ?SalesTeam
@@ -150,13 +179,17 @@ class AdminStaffController extends Controller
         };
     }
 
-    private function resolveTeamForRole(AdminRole $role, ?string $teamValue): ?SalesTeam
+    private function resolveTeamForRole(AdminRole $role, mixed $teamValue): ?SalesTeam
     {
         if (! in_array($role, [AdminRole::SalesManager, AdminRole::SalesEmployee], true)) {
             return null;
         }
 
-        if ($teamValue) {
+        if ($teamValue instanceof SalesTeam) {
+            return $teamValue;
+        }
+
+        if (is_string($teamValue) && $teamValue !== '') {
             return SalesTeam::from($teamValue);
         }
 
@@ -179,9 +212,14 @@ class AdminStaffController extends Controller
         if ($managerId && $team) {
             $manager = Admin::query()->find($managerId);
             if ($manager && $manager->role === AdminRole::SalesManager) {
-                $managerTeam = $manager->sales_team ?? SalesTeam::Candidate->value;
-                if ($managerTeam !== $team->value) {
-                    $errors['manager_id'] = 'Manager must be on the same sales team ('.$team->shortLabel().').';
+                $employeeTeam = $team->value;
+                $managerTeam = SalesTeam::normalize($manager->sales_team);
+
+                if ($managerTeam !== $employeeTeam) {
+                    $managerLabel = SalesTeam::from($managerTeam)->shortLabel();
+                    $errors['manager_id'] = 'Selected manager is on the '.$managerLabel
+                        .'. Choose a manager from the '.$team->shortLabel()
+                        .', or change the sales team above.';
                 }
             }
         }
@@ -231,7 +269,7 @@ class AdminStaffController extends Controller
             $staff->name = $validated['name'];
             $staff->email = $validated['email'];
             if (! empty($validated['password'])) {
-                $staff->password = Hash::make($validated['password']);
+                $staff->password = $validated['password'];
             }
             $staff->save();
             app(AdminReferralCodeService::class)->ensureCode($staff->fresh());
@@ -268,7 +306,7 @@ class AdminStaffController extends Controller
         $staff->sales_team = $team?->value;
         $staff->manager_id = $validated['manager_id'] ?? null;
         if (! empty($validated['password'])) {
-            $staff->password = Hash::make($validated['password']);
+            $staff->password = $validated['password'];
         }
         $staff->save();
         app(AdminReferralCodeService::class)->ensureCode($staff->fresh());

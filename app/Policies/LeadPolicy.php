@@ -78,8 +78,7 @@ class LeadPolicy
             return false;
         }
 
-        return (int) $lead->sales_manager_id === (int) $admin->id
-            || (int) $lead->assigned_to === (int) $admin->id;
+        return $this->visibility->canViewLead($admin, $lead);
     }
 
     public function takeBack(Admin $admin, HirevoLead $lead): bool
@@ -96,7 +95,7 @@ class LeadPolicy
             return $this->view($admin, $lead);
         }
 
-        return (int) $lead->sales_manager_id === (int) $admin->id;
+        return $this->visibility->canViewLead($admin, $lead);
     }
 
     public function releaseToPool(Admin $admin, HirevoLead $lead): bool

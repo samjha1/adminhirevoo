@@ -23,10 +23,7 @@ class LeadVisibilityService
         }
 
         match ($admin->role) {
-            AdminRole::SalesManager => $query->where(function (Builder $q) use ($admin) {
-                $q->where('sales_manager_id', $admin->id)
-                    ->orWhere('assigned_to', $admin->id);
-            }),
+            AdminRole::SalesManager => $this->scopeForSalesManager($query, $admin),
             AdminRole::SalesEmployee => $query->where('assigned_to', $admin->id),
             default => null,
         };
@@ -39,10 +36,42 @@ class LeadVisibilityService
         }
 
         if ($admin->role === AdminRole::SalesEmployee) {
-            return $lead->assigned_to === $admin->id;
+            return (int) $lead->assigned_to === (int) $admin->id;
         }
 
-        return $lead->sales_manager_id === $admin->id
-            || $lead->assigned_to === $admin->id;
+        if ($admin->role === AdminRole::SalesManager) {
+            if ((int) $lead->sales_manager_id === (int) $admin->id
+                || (int) $lead->assigned_to === (int) $admin->id) {
+                return true;
+            }
+
+            if ($lead->assigned_to) {
+                return Admin::query()
+                    ->whereKey($lead->assigned_to)
+                    ->where('manager_id', $admin->id)
+                    ->exists();
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
+    /** @param  Builder<HirevoLead>  $query */
+    private function scopeForSalesManager(Builder $query, Admin $manager): void
+    {
+        $reportIds = Admin::query()
+            ->where('manager_id', $manager->id)
+            ->pluck('id');
+
+        $query->where(function (Builder $q) use ($manager, $reportIds) {
+            $q->where('sales_manager_id', $manager->id)
+                ->orWhere('assigned_to', $manager->id);
+
+            if ($reportIds->isNotEmpty()) {
+                $q->orWhereIn('assigned_to', $reportIds);
+            }
+        });
     }
 }

@@ -22,10 +22,7 @@ class EmployerProspectVisibilityService
         }
 
         match ($admin->role) {
-            AdminRole::SalesManager => $query->where(function (Builder $q) use ($admin) {
-                $q->where('sales_manager_id', $admin->id)
-                    ->orWhere('assigned_to', $admin->id);
-            }),
+            AdminRole::SalesManager => $this->scopeForSalesManager($query, $admin),
             AdminRole::SalesEmployee => $query->where('assigned_to', $admin->id),
             default => null,
         };
@@ -42,14 +39,42 @@ class EmployerProspectVisibilityService
         }
 
         if ($admin->role === AdminRole::SalesEmployee) {
-            return $prospect->assigned_to === $admin->id;
+            return (int) $prospect->assigned_to === (int) $admin->id;
         }
 
         if ($admin->role === AdminRole::SalesManager) {
-            return $prospect->sales_manager_id === $admin->id
-                || $prospect->assigned_to === $admin->id;
+            if ((int) $prospect->sales_manager_id === (int) $admin->id
+                || (int) $prospect->assigned_to === (int) $admin->id) {
+                return true;
+            }
+
+            if ($prospect->assigned_to) {
+                return Admin::query()
+                    ->whereKey($prospect->assigned_to)
+                    ->where('manager_id', $admin->id)
+                    ->exists();
+            }
+
+            return false;
         }
 
         return false;
+    }
+
+    /** @param  Builder<CrmEmployerProspect>  $query */
+    private function scopeForSalesManager(Builder $query, Admin $manager): void
+    {
+        $reportIds = Admin::query()
+            ->where('manager_id', $manager->id)
+            ->pluck('id');
+
+        $query->where(function (Builder $q) use ($manager, $reportIds) {
+            $q->where('sales_manager_id', $manager->id)
+                ->orWhere('assigned_to', $manager->id);
+
+            if ($reportIds->isNotEmpty()) {
+                $q->orWhereIn('assigned_to', $reportIds);
+            }
+        });
     }
 }

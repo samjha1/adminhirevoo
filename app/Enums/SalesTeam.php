@@ -38,4 +38,18 @@ enum SalesTeam: string
             self::Employer => 'bi-buildings',
         };
     }
+
+    /** Normalize enum, string, or null to a team slug (defaults to talent when unknown). */
+    public static function normalize(mixed $team, self $default = self::Candidate): string
+    {
+        if ($team instanceof self) {
+            return $team->value;
+        }
+
+        if (is_string($team) && $team !== '') {
+            return self::tryFrom($team)?->value ?? $default->value;
+        }
+
+        return $default->value;
+    }
 }

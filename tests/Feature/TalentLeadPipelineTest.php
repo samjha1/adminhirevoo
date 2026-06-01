@@ -53,6 +53,27 @@ class TalentLeadPipelineTest extends TestCase
             ->assertSee('job application');
     }
 
+    public function test_stage_counts_only_include_visible_leads(): void
+    {
+        HirevoLead::query()->create([
+            'candidate_id' => null,
+            'status' => 'available',
+            'assignment_status' => LeadAssignmentStatus::New->value,
+        ]);
+        HirevoLead::query()->create([
+            'candidate_id' => null,
+            'status' => 'available',
+            'assignment_status' => LeadAssignmentStatus::New->value,
+        ]);
+
+        $exec = Admin::query()->where('email', 'talent.executive@themesdesign.test')->firstOrFail();
+
+        $this->actingAs($exec, 'admin')
+            ->get(route('admin.leads.index'))
+            ->assertOk()
+            ->assertViewHas('crmStageCounts', fn (array $counts) => array_sum($counts) === 0);
+    }
+
     public function test_executive_does_not_see_unassigned_lead(): void
     {
         $candidate = HirevoUser::query()->create([
@@ -103,6 +124,48 @@ class TalentLeadPipelineTest extends TestCase
             ->get(route('admin.leads.index'))
             ->assertOk()
             ->assertSee('Assigned Executive Lead');
+    }
+
+    public function test_sales_manager_sees_leads_assigned_to_team_employees(): void
+    {
+        $marketing = Admin::query()->where('email', 'marketing@themesdesign.test')->firstOrFail();
+        $manager = Admin::query()->where('email', 'talent.manager@themesdesign.test')->firstOrFail();
+        $exec = Admin::query()->where('email', 'talent.executive@themesdesign.test')->firstOrFail();
+
+        $candidate = HirevoUser::query()->create([
+            'name' => 'Manager Team Lead',
+            'email' => 'manager.team.'.uniqid().'@hirevoo.test',
+            'role' => 'candidate',
+        ]);
+
+        $lead = HirevoLead::query()->create([
+            'candidate_id' => $candidate->id,
+            'status' => 'available',
+            'match_percentage' => 80,
+            'assignment_status' => LeadAssignmentStatus::New->value,
+        ]);
+
+        app(LeadAssignmentService::class)->assignToSalesManager($lead, $manager, $marketing);
+        app(LeadAssignmentService::class)->assignToEmployee($lead->fresh(), $exec, $manager);
+
+        $this->actingAs($manager, 'admin')
+            ->get(route('admin.leads.index'))
+            ->assertOk()
+            ->assertSee('Manager Team Lead');
+
+        $orphan = HirevoLead::query()->create([
+            'candidate_id' => $candidate->id,
+            'status' => 'available',
+            'assignment_status' => LeadAssignmentStatus::InProgress->value,
+            'assigned_to' => $exec->id,
+            'sales_manager_id' => null,
+        ]);
+
+        $this->actingAs($manager, 'admin')
+            ->get(route('admin.leads.index'))
+            ->assertOk()
+            ->assertViewHas('leads', fn ($paginator) => collect($paginator->items())
+                ->contains(fn ($row) => (int) $row->id === (int) $orphan->id));
     }
 
     public function test_lead_search_by_referral_source(): void

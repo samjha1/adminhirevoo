@@ -11,7 +11,6 @@ use App\Models\Admin;
 use App\Models\AdminLeadStage;
 use App\Models\Hirevo\HirevoCareerConsultationRequest;
 use App\Models\Hirevo\HirevoLead;
-use App\Modules\Leads\Models\CrmCallLog;
 use App\Modules\Leads\Models\CrmFollowUp;
 use App\Modules\Leads\Services\LeadTimelineService;
 use App\Services\CandidateInsightService;
@@ -52,11 +51,12 @@ class LeadController extends Controller
     {
         $admin = auth('admin')->user();
 
-        $leadQuery = HirevoLead::query()
+        $visibleLeadsQuery = HirevoLead::query();
+        $this->visibility->restrictVisibleLeads($visibleLeadsQuery, $admin);
+
+        $leadQuery = (clone $visibleLeadsQuery)
             ->with(['candidate', 'adminStage', 'assignedTo', 'salesManager'])
             ->orderByDesc('created_at');
-
-        $this->visibility->restrictVisibleLeads($leadQuery, $admin);
 
         if ($request->filled('status')) {
             $leadQuery->where('status', $request->string('status')->toString());
@@ -140,7 +140,7 @@ class LeadController extends Controller
         return view('admin.leads.index', [
             'leads' => $leads,
             'consultations' => $consultations,
-            'crmStageCounts' => $this->leadPipeline->managementStageCounts(),
+            'crmStageCounts' => $this->leadPipeline->managementStageCountsFor($visibleLeadsQuery),
             'managementStages' => $this->leadPipeline->managementStages(),
             'crmStageLabels' => $this->leadPipeline->managementStageLabels(),
             'assignableManagers' => $assignableManagers,
@@ -305,8 +305,7 @@ class LeadController extends Controller
             'assignableManagers' => $assignableManagers,
             'assignableEmployees' => $assignableEmployees,
             'timeline' => $timelineService->forLead($lead),
-            'recentCalls' => CrmCallLog::query()->where('lead_id', $lead->id)->with('admin')->orderByDesc('called_at')->limit(5)->get(),
-            'upcomingFollowUps' => CrmFollowUp::query()->where('lead_id', $lead->id)->with('admin')->orderBy('scheduled_at')->limit(5)->get(),
+            'upcomingFollowUps' => CrmFollowUp::query()->where('lead_id', $lead->id)->with('admin')->orderBy('scheduled_at')->limit(8)->get(),
         ]);
     }
 

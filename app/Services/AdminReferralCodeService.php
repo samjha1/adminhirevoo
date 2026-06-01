@@ -23,6 +23,31 @@ class AdminReferralCodeService
             ->first();
     }
 
+    /**
+     * Set a manual referral code or auto-generate when eligible and none provided.
+     */
+    public function assignCode(Admin $admin, ?string $requested = null): ?string
+    {
+        if (! $this->isEligible($admin)) {
+            if ($admin->referral_code) {
+                $admin->referral_code = null;
+                $admin->save();
+            }
+
+            return null;
+        }
+
+        $normalized = $this->normalize($requested);
+        if ($normalized !== '') {
+            $admin->referral_code = $normalized;
+            $admin->save();
+
+            return $admin->referral_code;
+        }
+
+        return $this->ensureCode($admin);
+    }
+
     public function ensureCode(Admin $admin): ?string
     {
         if (! $this->isEligible($admin)) {
@@ -37,6 +62,11 @@ class AdminReferralCodeService
         $admin->save();
 
         return $admin->referral_code;
+    }
+
+    public function generatePreviewCode(): string
+    {
+        return $this->generateUniqueCode();
     }
 
     public function backfillEmployerTeamCodes(): int
