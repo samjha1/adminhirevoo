@@ -7,6 +7,7 @@ use App\Enums\SalesTeam;
 use App\Http\Controllers\Controller;
 use App\Models\Admin;
 use App\Modules\Rbac\Models\CrmRole;
+use App\Services\AdminReferralCodeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -126,7 +127,7 @@ class AdminStaffController extends Controller
         $crmRole = CrmRole::query()->where('slug', $data['role']->crmRoleSlug())->first();
         $team = $data['sales_team'] ?? $this->defaultTeamForRole($data['role']);
 
-        return Admin::query()->create([
+        $admin = Admin::query()->create([
             'name' => $data['name'],
             'email' => $data['email'],
             'password' => $data['password'],
@@ -135,6 +136,10 @@ class AdminStaffController extends Controller
             'sales_team' => $team?->value,
             'manager_id' => $data['manager_id'],
         ]);
+
+        app(AdminReferralCodeService::class)->ensureCode($admin);
+
+        return $admin;
     }
 
     private function defaultTeamForRole(AdminRole $role): ?SalesTeam
@@ -229,6 +234,7 @@ class AdminStaffController extends Controller
                 $staff->password = Hash::make($validated['password']);
             }
             $staff->save();
+            app(AdminReferralCodeService::class)->ensureCode($staff->fresh());
 
             return redirect()->route('admin.staff.index')->with('success', 'Team member updated.');
         }
@@ -265,6 +271,7 @@ class AdminStaffController extends Controller
             $staff->password = Hash::make($validated['password']);
         }
         $staff->save();
+        app(AdminReferralCodeService::class)->ensureCode($staff->fresh());
 
         return redirect()->route('admin.staff.index')->with('success', 'Staff user updated.');
     }

@@ -29,6 +29,7 @@ return new class extends Migration
                 $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
                 $table->string('company_name');
                 $table->string('company_email')->nullable();
+                $table->string('referral_code', 50)->nullable();
                 $table->boolean('is_approved')->default(false);
                 $table->timestamps();
             });

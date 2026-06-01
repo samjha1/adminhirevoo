@@ -24,6 +24,7 @@ class Admin extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'referral_code',
         'password',
         'role',
         'crm_role_id',

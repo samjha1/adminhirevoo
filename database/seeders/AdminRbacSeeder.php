@@ -63,6 +63,8 @@ class AdminRbacSeeder extends Seeder
             SalesTeam::Employer,
             $password,
         );
+
+        app(\App\Services\AdminReferralCodeService::class)->backfillEmployerTeamCodes();
     }
 
     private function upsertAdmin(

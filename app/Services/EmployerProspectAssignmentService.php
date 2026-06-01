@@ -170,4 +170,43 @@ class EmployerProspectAssignmentService
             throw new InvalidArgumentException('Employee must report to this manager.');
         }
     }
+
+    public function assignFromReferralCode(CrmEmployerProspect $prospect, Admin $admin): CrmEmployerProspect
+    {
+        if ($prospect->assigned_to) {
+            return $prospect;
+        }
+
+        if ($this->teams->teamFor($admin) !== SalesTeam::Employer) {
+            return $prospect;
+        }
+
+        if (! in_array($admin->role, [AdminRole::SalesManager, AdminRole::SalesEmployee], true)) {
+            return $prospect;
+        }
+
+        return DB::transaction(function () use ($prospect, $admin) {
+            if ($admin->role === AdminRole::SalesManager) {
+                $prospect->assigned_to = $admin->id;
+                $prospect->sales_manager_id = $admin->id;
+                $prospect->assignment_role_level = AssignmentRoleLevel::Manager;
+                $prospect->assignment_status = LeadAssignmentStatus::Assigned;
+            } else {
+                $prospect->assigned_to = $admin->id;
+                $prospect->sales_manager_id = $admin->manager_id;
+                $prospect->assignment_role_level = AssignmentRoleLevel::Employee;
+                $prospect->assignment_status = LeadAssignmentStatus::InProgress;
+            }
+
+            $prospect->assigned_by = null;
+            $prospect->source = 'hirevo_referral';
+            $prospect->save();
+
+            $this->audit->log('employer.referral_auto_assign', $admin, $prospect, [
+                'referral_code' => $admin->referral_code,
+            ]);
+
+            return $prospect->fresh();
+        });
+    }
 }

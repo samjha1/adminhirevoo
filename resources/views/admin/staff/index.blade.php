@@ -57,6 +57,9 @@
                     <th>Team</th>
                     @endif
                     <th>Manager</th>
+                    @if(!$mgrOnly)
+                    <th>Referral code</th>
+                    @endif
                     <th>Created</th>
                     <th></th>
                 </tr>
@@ -77,6 +80,15 @@
                         </td>
                         @endif
                         <td>{{ $user->manager?->name ?? '—' }}</td>
+                        @if(!$mgrOnly)
+                        <td>
+                            @if($user->referral_code)
+                                <code>{{ $user->referral_code }}</code>
+                            @else
+                                <span class="text-muted">—</span>
+                            @endif
+                        </td>
+                        @endif
                         <td class="text-muted small">{{ $user->created_at?->format('Y-m-d') }}</td>
                         <td class="text-end">
                             <a href="{{ route('admin.staff.edit', $user) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
