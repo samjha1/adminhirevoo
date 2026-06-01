@@ -127,5 +127,77 @@ class EmployerReferralCodeAssignmentTest extends TestCase
 
         $prospect = CrmEmployerProspect::query()->where('user_id', $userId)->firstOrFail();
         $this->assertSame($otherExecutive->id, $prospect->assigned_to);
+        $this->assertSame('manual', $prospect->source);
+    }
+
+    public function test_sync_does_not_overwrite_referral_source_on_resync(): void
+    {
+        $executive = Admin::query()->where('email', 'company.executive@themesdesign.test')->firstOrFail();
+        $code = app(AdminReferralCodeService::class)->ensureCode($executive);
+
+        $userId = DB::table('users')->insertGetId([
+            'name' => 'Resync Source Co',
+            'email' => 'resync-source-co@hirevoo.test',
+            'phone' => '6666666666',
+            'role' => 'referrer',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('referrer_profiles')->insert([
+            'user_id' => $userId,
+            'company_name' => 'Resync Source Co',
+            'company_email' => 'resync-source-co@hirevoo.test',
+            'referral_code' => $code,
+            'is_approved' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $sync = app(EmployerProspectSyncService::class);
+        $sync->syncFromHirevo();
+        $sync->syncFromHirevo();
+
+        $prospect = CrmEmployerProspect::query()->where('user_id', $userId)->firstOrFail();
+        $this->assertSame('hirevo_referral', $prospect->source);
+        $this->assertSame($executive->id, $prospect->assigned_to);
+    }
+
+    public function test_backfill_assigns_existing_unassigned_prospects(): void
+    {
+        $executive = Admin::query()->where('email', 'company.executive@themesdesign.test')->firstOrFail();
+        $code = app(AdminReferralCodeService::class)->ensureCode($executive);
+
+        $userId = DB::table('users')->insertGetId([
+            'name' => 'Backfill Co',
+            'email' => 'backfill-co@hirevoo.test',
+            'phone' => '5555555555',
+            'role' => 'referrer',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('referrer_profiles')->insert([
+            'user_id' => $userId,
+            'company_name' => 'Backfill Co',
+            'company_email' => 'backfill-co@hirevoo.test',
+            'referral_code' => $code,
+            'is_approved' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        CrmEmployerProspect::query()->create([
+            'user_id' => $userId,
+            'company_name' => 'Backfill Co',
+            'source' => 'hirevo_signup',
+        ]);
+
+        $assigned = app(EmployerProspectSyncService::class)->backfillReferralAssignments();
+        $this->assertSame(1, $assigned);
+
+        $prospect = CrmEmployerProspect::query()->where('user_id', $userId)->firstOrFail();
+        $this->assertSame($executive->id, $prospect->assigned_to);
+        $this->assertSame('hirevo_referral', $prospect->source);
     }
 }

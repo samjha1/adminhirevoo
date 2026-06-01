@@ -186,27 +186,32 @@ class EmployerProspectAssignmentService
         }
 
         return DB::transaction(function () use ($prospect, $admin) {
-            if ($admin->role === AdminRole::SalesManager) {
-                $prospect->assigned_to = $admin->id;
-                $prospect->sales_manager_id = $admin->id;
-                $prospect->assignment_role_level = AssignmentRoleLevel::Manager;
-                $prospect->assignment_status = LeadAssignmentStatus::Assigned;
-            } else {
-                $prospect->assigned_to = $admin->id;
-                $prospect->sales_manager_id = $admin->manager_id;
-                $prospect->assignment_role_level = AssignmentRoleLevel::Employee;
-                $prospect->assignment_status = LeadAssignmentStatus::InProgress;
+            $locked = CrmEmployerProspect::query()->lockForUpdate()->find($prospect->id);
+            if (! $locked || $locked->assigned_to) {
+                return $locked ?? $prospect;
             }
 
-            $prospect->assigned_by = null;
-            $prospect->source = 'hirevo_referral';
-            $prospect->save();
+            if ($admin->role === AdminRole::SalesManager) {
+                $locked->assigned_to = $admin->id;
+                $locked->sales_manager_id = $admin->id;
+                $locked->assignment_role_level = AssignmentRoleLevel::Manager;
+                $locked->assignment_status = LeadAssignmentStatus::Assigned;
+            } else {
+                $locked->assigned_to = $admin->id;
+                $locked->sales_manager_id = $admin->manager_id;
+                $locked->assignment_role_level = AssignmentRoleLevel::Employee;
+                $locked->assignment_status = LeadAssignmentStatus::InProgress;
+            }
 
-            $this->audit->log('employer.referral_auto_assign', $admin, $prospect, [
+            $locked->assigned_by = null;
+            $locked->source = 'hirevo_referral';
+            $locked->save();
+
+            $this->audit->log('employer.referral_auto_assign', $admin, $locked, [
                 'referral_code' => $admin->referral_code,
             ]);
 
-            return $prospect->fresh();
+            return $locked->fresh();
         });
     }
 }

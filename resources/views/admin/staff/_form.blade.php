@@ -81,6 +81,17 @@
     </div>
 @endif
 
+@if(isset($staff) && $staff->referral_code && ($staff->sales_team?->value ?? $staff->sales_team) === 'employer')
+<div class="mb-3">
+    <label class="form-label">Employer referral code</label>
+    <div class="input-group">
+        <input type="text" class="form-control font-monospace" value="{{ $staff->referral_code }}" readonly id="staff-referral-code">
+        <button type="button" class="btn btn-outline-secondary" onclick="navigator.clipboard.writeText(document.getElementById('staff-referral-code').value)">Copy</button>
+    </div>
+    <div class="form-text">Share with employers at sign-up — their company is auto-assigned to this CRM user.</div>
+</div>
+@endif
+
 @push('styles')
 <style>
     .staff-form-card { max-width: 680px; border-radius: 16px; }
