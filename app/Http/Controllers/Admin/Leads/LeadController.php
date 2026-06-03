@@ -309,13 +309,15 @@ class LeadController extends Controller
         ]);
     }
 
-    public function updateStage(Request $request, HirevoLead $lead): RedirectResponse
+    public function updateStage(Request $request, HirevoLead $lead, \App\Modules\Leads\Services\FollowUpService $followUpService): RedirectResponse
     {
         $this->authorize('updateCrmStage', $lead);
 
         $validated = $request->validate([
             'stage' => ['required', Rule::in($this->leadPipeline->managementStages())],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'follow_up_scheduled_at' => ['required_if:stage,follow_up,interview', 'nullable', 'date'],
+            'follow_up_notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
         $stage = AdminLeadStage::query()->firstOrNew(['lead_id' => $lead->id]);
@@ -325,6 +327,14 @@ class LeadController extends Controller
             $stage->last_contacted_at = now();
         }
         $stage->save();
+
+        if (in_array($validated['stage'], ['follow_up', 'interview'], true)
+            && $request->user('admin')->canPermission('leads.manage_followups')) {
+            $followUpService->schedule($lead, $request->user('admin'), [
+                'scheduled_at' => $validated['follow_up_scheduled_at'],
+                'notes' => $validated['follow_up_notes'] ?? null,
+            ]);
+        }
 
         return back()->with('success', 'Lead management stage updated.');
     }

@@ -27,9 +27,14 @@
                             @if($prospect->expected_revenue)
                                 <div class="small text-success">₹{{ number_format($prospect->expected_revenue, 0) }} exp.</div>
                             @endif
-                            <form method="POST" action="{{ route('admin.employers.pipeline.stage', $prospect) }}" class="mt-2">
+                            <form method="POST" action="{{ route('admin.employers.pipeline.stage', $prospect) }}" class="mt-2"
+                                  data-kanban-stage-form
+                                  data-detail-url="{{ route('admin.employers.pipeline.show', $prospect) }}">
                                 @csrf
-                                <select name="pipeline_stage" class="form-select form-select-sm" onchange="this.form.submit()">
+                                <select name="pipeline_stage" class="form-select form-select-sm"
+                                        data-kanban-stage-select
+                                        data-follow-up-value="follow_up"
+                                        data-meeting-value="meeting_scheduled">
                                     @foreach($stageLabels as $val => $label)
                                         <option value="{{ $val }}" @selected($prospect->pipeline_stage === $val)>{{ $label }}</option>
                                     @endforeach
@@ -41,4 +46,5 @@
             </div>
         @endforeach
     </div>
+    @include('partials.crm-kanban-follow-up-guard')
 @endsection

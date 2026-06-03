@@ -17,7 +17,8 @@ class LeadFollowUpController extends Controller
         $admin = $request->user('admin');
 
         $followUps = CrmFollowUp::query()
-            ->with(['admin'])
+            ->with(['admin', 'lead.candidate'])
+            ->whereNotNull('lead_id')
             ->where('admin_id', $admin->id)
             ->orderBy('scheduled_at')
             ->paginate(20);
@@ -33,6 +34,8 @@ class LeadFollowUpController extends Controller
         $admin = $request->user('admin');
 
         $followUps = CrmFollowUp::query()
+            ->with(['admin', 'lead.candidate'])
+            ->whereNotNull('lead_id')
             ->where('admin_id', $admin->id)
             ->whereDate('scheduled_at', today())
             ->orderBy('scheduled_at')
@@ -61,8 +64,17 @@ class LeadFollowUpController extends Controller
 
     public function complete(Request $request, CrmFollowUp $followUp, FollowUpService $followUpService): RedirectResponse
     {
-        $lead = HirevoLead::query()->findOrFail($followUp->lead_id);
-        $this->authorize('manageFollowups', $lead);
+        if ($followUp->employer_prospect_id) {
+            $prospect = \App\Modules\Leads\Models\CrmEmployerProspect::query()->findOrFail($followUp->employer_prospect_id);
+            abort_unless(
+                app(\App\Services\EmployerProspectVisibilityService::class)->canView($request->user('admin'), $prospect),
+                403,
+            );
+            abort_unless($request->user('admin')->canPermission('leads.manage_followups'), 403);
+        } else {
+            $lead = HirevoLead::query()->findOrFail($followUp->lead_id);
+            $this->authorize('manageFollowups', $lead);
+        }
 
         $followUpService->complete($followUp, $request->user('admin'));
 

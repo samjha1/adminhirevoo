@@ -125,6 +125,7 @@
     }
     .badge-b2b-stage.s-lead_generated { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
     .badge-b2b-stage.s-contacted { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+    .badge-b2b-stage.s-follow_up { background: #fffbeb; color: #b45309; border-color: #fde68a; }
     .badge-b2b-stage.s-interested { background: #f5f3ff; color: #6d28d9; border-color: #ddd6fe; }
     .badge-b2b-stage.s-meeting_scheduled { background: #fffbeb; color: #b45309; border-color: #fde68a; }
     .badge-b2b-stage.s-demo_completed { background: #ecfeff; color: #0e7490; border-color: #a5f3fc; }

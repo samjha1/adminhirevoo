@@ -8,10 +8,12 @@ use App\Http\Controllers\Admin\JobController;
 use App\Http\Controllers\Admin\Leads\LeadCallController;
 use App\Http\Controllers\Admin\Leads\LeadController;
 use App\Http\Controllers\Admin\Leads\LeadFollowUpController;
+use App\Http\Controllers\Admin\Leads\CompanyFollowUpController;
 use App\Http\Controllers\Admin\Leads\EmployerPipelineController;
 use App\Http\Controllers\Admin\Leads\LeadKanbanController;
 use App\Http\Controllers\Admin\Leads\StandaloneLeadController;
 use App\Http\Controllers\Admin\PaymentController;
+use App\Http\Controllers\Admin\EmployerPlanPaymentController;
 use App\Http\Controllers\Admin\ReferralController;
 use App\Http\Controllers\Admin\ReferralFormSubmissionController;
 use App\Http\Controllers\Admin\Settings\RbacSettingsController;
@@ -130,12 +132,35 @@ Route::middleware(['admin.guard', 'auth:admin', 'permission:leads.view', 'sales.
     Route::post('/pipelines/companies/{prospect}/stage', [EmployerPipelineController::class, 'updateStage'])
         ->middleware('permission:leads.update_stage')
         ->name('admin.employers.pipeline.stage');
+    Route::post('/pipelines/companies/{prospect}/follow-ups', [EmployerPipelineController::class, 'storeFollowUp'])
+        ->middleware('permission:leads.manage_followups')
+        ->name('admin.employers.follow-ups.store');
+    Route::post('/pipelines/companies/{prospect}/meetings', [EmployerPipelineController::class, 'storeMeeting'])
+        ->middleware('permission:leads.manage_followups')
+        ->name('admin.employers.meetings.store');
+    Route::post('/meetings/{meeting}/complete', [CompanyFollowUpController::class, 'completeMeeting'])
+        ->middleware('permission:leads.manage_followups')
+        ->name('admin.companies.meetings.complete');
+    Route::get('/follow-ups/companies', [CompanyFollowUpController::class, 'index'])
+        ->middleware('permission:leads.manage_followups')
+        ->name('admin.companies.follow-ups.index');
+    Route::get('/follow-ups/companies/today', [CompanyFollowUpController::class, 'today'])
+        ->middleware('permission:leads.manage_followups')
+        ->name('admin.companies.follow-ups.today');
     Route::post('/pipelines/companies/bulk/assign-manager', [EmployerPipelineController::class, 'bulkAssignManagers'])
         ->middleware(['permission:leads.assign_manager', 'throttle:30,1'])
         ->name('admin.employers.pipeline.bulk-assign-manager');
     Route::post('/pipelines/companies/bulk/assign-employee', [EmployerPipelineController::class, 'bulkAssignEmployees'])
         ->middleware(['permission:leads.assign_employee', 'throttle:30,1'])
         ->name('admin.employers.pipeline.bulk-assign-employee');
+});
+
+Route::middleware(['admin.guard', 'auth:admin', 'permission:employer_payments.view'])->group(function () {
+    Route::get('/employer-plan-payments', [EmployerPlanPaymentController::class, 'index'])
+        ->name('admin.employer-plan-payments.index');
+    Route::post('/employer-plan-payments/{payment}/complete', [EmployerPlanPaymentController::class, 'complete'])
+        ->middleware('permission:employer_payments.complete')
+        ->name('admin.employer-plan-payments.complete');
 });
 
 Route::middleware(['admin.guard', 'auth:admin', 'permission:consultations.view'])->group(function () {

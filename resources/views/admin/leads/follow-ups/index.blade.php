@@ -1,15 +1,17 @@
 @extends('layouts.app')
 
-@section('title', 'My Follow-ups')
+@section('title', 'Candidate follow-ups')
 
 @section('content')
     <div class="page-header">
         <div>
-            <h1 class="page-title">@if($filter === 'today') Today's follow-ups @else All follow-ups @endif</h1>
+            <h1 class="page-title">@if($filter === 'today') Today's candidate follow-ups @else All candidate follow-ups @endif</h1>
+            <p class="page-subtitle mb-0">Scheduled touchpoints for job seeker leads.</p>
         </div>
         <div class="d-flex gap-2">
             <a href="{{ route('admin.follow-ups.today') }}" class="btn btn-sm @if($filter === 'today') btn-primary @else btn-outline-primary @endif">Today</a>
             <a href="{{ route('admin.follow-ups.index') }}" class="btn btn-sm @if($filter === 'all') btn-primary @else btn-outline-primary @endif">All</a>
+            <a href="{{ route('admin.leads.index') }}" class="btn btn-sm btn-outline-secondary">Candidates</a>
         </div>
     </div>
 
@@ -18,7 +20,7 @@
             <table class="table align-middle mb-0">
                 <thead>
                     <tr>
-                        <th>Lead</th>
+                        <th>Candidate</th>
                         <th>Scheduled</th>
                         <th>Status</th>
                         <th>Notes</th>
@@ -28,7 +30,11 @@
                 <tbody>
                 @forelse($followUps as $fu)
                     <tr>
-                        <td><a href="{{ route('admin.leads.show', $fu->lead_id) }}">Lead #{{ $fu->lead_id }}</a></td>
+                        <td>
+                            <a href="{{ route('admin.leads.show', $fu->lead_id) }}">
+                                {{ $fu->lead?->candidate?->name ?? 'Lead #'.$fu->lead_id }}
+                            </a>
+                        </td>
                         <td>{{ $fu->scheduled_at?->format('Y-m-d H:i') }}</td>
                         <td><span class="badge text-bg-secondary">{{ $fu->status->label() }}</span></td>
                         <td class="text-muted small">{{ Str::limit($fu->notes, 60) }}</td>

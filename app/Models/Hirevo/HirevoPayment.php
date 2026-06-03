@@ -7,6 +7,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HirevoPayment extends Model
 {
+    public const TYPE_EMPLOYER_SUBSCRIPTION = 'employer_subscription';
+
+    public const STATUS_PENDING = 'pending';
+
+    public const STATUS_COMPLETED = 'completed';
+
+    public const GATEWAY_CHEQUE = 'cheque';
+
     protected $table = 'payments';
 
     protected $guarded = [];

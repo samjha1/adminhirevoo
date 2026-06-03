@@ -5,7 +5,9 @@ namespace App\Providers;
 use App\Models\Hirevo\HirevoLead;
 use App\Models\Leadsmanager\LeadsmanagerAd;
 use App\Policies\LeadPolicy;
+use App\Services\EmployerPlanPaymentVisibilityService;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
@@ -25,6 +27,20 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::policy(HirevoLead::class, LeadPolicy::class);
+
+        View::composer('partials.admin-sidebar-nav', function ($view) {
+            $admin = auth('admin')->user();
+            if ($admin === null) {
+                $view->with('employerPlanPaymentsPending', 0);
+
+                return;
+            }
+
+            $view->with(
+                'employerPlanPaymentsPending',
+                app(EmployerPlanPaymentVisibilityService::class)->pendingCountFor($admin),
+            );
+        });
 
         Route::bind('ad', fn (string $value) => LeadsmanagerAd::findOrFail($value));
     }

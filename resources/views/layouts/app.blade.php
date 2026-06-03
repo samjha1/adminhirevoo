@@ -38,16 +38,292 @@
         .brand-pill { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); }
         .sidebar {
             flex-shrink: 0;
-            width: 280px;
+            width: 272px;
             align-self: stretch;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background: linear-gradient(165deg, #0a0f1a 0%, #0f172a 42%, #111827 100%);
+            border-right: 1px solid rgba(148, 163, 184, .12);
+            box-shadow: 4px 0 24px rgba(0, 0, 0, .12);
+        }
+        .sidebar-scroll {
             overflow-y: auto;
             overflow-x: hidden;
-            background: linear-gradient(180deg, #0b1220, #0b1220 55%, #0f1730);
-            border-right: 1px solid rgba(15, 23, 42, .15);
+            padding: .5rem .85rem 1.25rem;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(148, 163, 184, .35) transparent;
         }
-        .sidebar .nav-link { color: rgba(255,255,255,.78); border-radius: 10px; }
-        .sidebar .nav-link:hover { color: #fff; background: rgba(255,255,255,.08); }
-        .sidebar .nav-link.active { color: #fff; background: rgba(59,130,246,.18); border: 1px solid rgba(59,130,246,.25); }
+        .sidebar-scroll::-webkit-scrollbar { width: 5px; }
+        .sidebar-scroll::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, .3);
+            border-radius: 999px;
+        }
+        .sidebar-brand {
+            flex-shrink: 0;
+            padding: 1.15rem 1rem 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, .06);
+        }
+        .sidebar-brand-link {
+            display: flex;
+            align-items: center;
+            gap: .75rem;
+            text-decoration: none;
+            color: inherit;
+            transition: opacity .2s ease;
+        }
+        .sidebar-brand-link:hover { opacity: .92; }
+        .sidebar-brand-mark {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.15rem;
+            color: #fff;
+            background: linear-gradient(135deg, #3b82f6, #6366f1);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, .35);
+        }
+        .sidebar-brand-title {
+            display: block;
+            font-size: 1rem;
+            font-weight: 800;
+            letter-spacing: -.02em;
+            color: #fff;
+            line-height: 1.2;
+        }
+        .sidebar-brand-sub {
+            display: block;
+            font-size: .68rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: rgba(255, 255, 255, .45);
+            margin-top: 2px;
+        }
+        .sidebar-nav { display: flex; flex-direction: column; gap: .35rem; }
+        .sidebar-group { margin-top: .65rem; }
+        .sidebar-group:first-child { margin-top: 0; }
+        .sidebar-group-label {
+            display: flex;
+            align-items: center;
+            gap: .4rem;
+            font-size: .64rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .1em;
+            color: rgba(255, 255, 255, .38);
+            padding: .5rem .55rem .35rem;
+        }
+        .sidebar-group-label i { font-size: .75rem; opacity: .7; }
+        .sidebar-group--company .sidebar-group-label { color: rgba(110, 231, 183, .65); }
+        .sidebar-group--talent .sidebar-group-label { color: rgba(147, 197, 253, .7); }
+        .sidebar-group-links {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            padding: .25rem;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, .02);
+        }
+        .sidebar-group--company .sidebar-group-links {
+            background: rgba(16, 185, 129, .06);
+            border: 1px solid rgba(16, 185, 129, .08);
+        }
+        .sidebar-group--talent .sidebar-group-links {
+            background: rgba(59, 130, 246, .06);
+            border: 1px solid rgba(59, 130, 246, .08);
+        }
+        .sidebar-link {
+            display: flex;
+            align-items: center;
+            gap: .65rem;
+            padding: .55rem .6rem;
+            border-radius: 10px;
+            text-decoration: none;
+            color: rgba(255, 255, 255, .78);
+            border: 1px solid transparent;
+            transition: background .2s ease, color .2s ease, border-color .2s ease, transform .15s ease;
+            position: relative;
+        }
+        .sidebar-link:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, .07);
+            border-color: rgba(255, 255, 255, .06);
+        }
+        .sidebar-link.is-active {
+            color: #fff;
+            background: rgba(59, 130, 246, .2);
+            border-color: rgba(96, 165, 250, .35);
+            box-shadow: 0 4px 16px rgba(37, 99, 235, .2);
+        }
+        .sidebar-group--company .sidebar-link.is-active {
+            background: rgba(5, 150, 105, .22);
+            border-color: rgba(52, 211, 153, .35);
+            box-shadow: 0 4px 16px rgba(5, 150, 105, .2);
+        }
+        .sidebar-link.is-active::before {
+            content: '';
+            position: absolute;
+            left: -4px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            height: 60%;
+            border-radius: 0 4px 4px 0;
+            background: #60a5fa;
+        }
+        .sidebar-group--company .sidebar-link.is-active::before { background: #34d399; }
+        .sidebar-link--child { padding-left: .45rem; }
+        .sidebar-link--child .sidebar-link-icon {
+            width: 30px;
+            height: 30px;
+            font-size: .85rem;
+            opacity: .9;
+        }
+        .sidebar-link-icon {
+            flex-shrink: 0;
+            width: 34px;
+            height: 34px;
+            border-radius: 9px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: .95rem;
+            background: rgba(255, 255, 255, .06);
+            color: rgba(255, 255, 255, .85);
+            transition: background .2s ease, transform .15s ease;
+        }
+        .sidebar-link:hover .sidebar-link-icon {
+            background: rgba(255, 255, 255, .1);
+            transform: scale(1.04);
+        }
+        .sidebar-link.is-active .sidebar-link-icon {
+            background: rgba(255, 255, 255, .15);
+            color: #fff;
+        }
+        .sidebar-group--company .sidebar-link.is-active .sidebar-link-icon {
+            background: rgba(16, 185, 129, .35);
+        }
+        .sidebar-link-text { min-width: 0; flex: 1; }
+        .sidebar-link-label {
+            display: block;
+            font-size: .84rem;
+            font-weight: 600;
+            line-height: 1.25;
+        }
+        .sidebar-link-sub {
+            display: block;
+            font-size: .68rem;
+            color: rgba(255, 255, 255, .45);
+            margin-top: 1px;
+            line-height: 1.2;
+        }
+        .sidebar-link.is-active .sidebar-link-sub { color: rgba(255, 255, 255, .6); }
+        .sidebar-link-badge {
+            margin-left: auto;
+            font-size: .68rem;
+            font-weight: 700;
+            line-height: 1;
+            padding: .2rem .45rem;
+            border-radius: 999px;
+            background: #fbbf24;
+            color: #78350f;
+        }
+        .sidebar-link.is-active .sidebar-link-badge {
+            background: rgba(255, 255, 255, .92);
+            color: #047857;
+        }
+        .sidebar-team-card {
+            display: flex;
+            align-items: center;
+            gap: .75rem;
+            margin-top: 1rem;
+            padding: .85rem;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, .04);
+            border: 1px solid rgba(255, 255, 255, .08);
+            transition: border-color .2s ease, background .2s ease;
+        }
+        .sidebar-team-card.is-company {
+            background: linear-gradient(135deg, rgba(5, 150, 105, .12), rgba(255, 255, 255, .03));
+            border-color: rgba(16, 185, 129, .2);
+        }
+        .sidebar-team-card.is-talent {
+            background: linear-gradient(135deg, rgba(37, 99, 235, .12), rgba(255, 255, 255, .03));
+            border-color: rgba(59, 130, 246, .2);
+        }
+        .sidebar-team-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 11px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+        .sidebar-team-card.is-company .sidebar-team-icon {
+            background: rgba(16, 185, 129, .25);
+            color: #6ee7b7;
+        }
+        .sidebar-team-card.is-talent .sidebar-team-icon {
+            background: rgba(59, 130, 246, .25);
+            color: #93c5fd;
+        }
+        .sidebar-team-kicker {
+            font-size: .62rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: rgba(255, 255, 255, .4);
+        }
+        .sidebar-team-name {
+            font-size: .9rem;
+            font-weight: 700;
+            color: #fff;
+            line-height: 1.2;
+        }
+        .sidebar-team-desc {
+            font-size: .7rem;
+            color: rgba(255, 255, 255, .45);
+            margin-top: 2px;
+        }
+        .sidebar-offcanvas {
+            width: min(300px, 88vw);
+            background: linear-gradient(165deg, #0a0f1a 0%, #0f172a 50%, #111827 100%);
+            border-right: 1px solid rgba(148, 163, 184, .12);
+        }
+        .sidebar-offcanvas .offcanvas-header {
+            border-bottom: 1px solid rgba(255, 255, 255, .06);
+            padding: 1rem 1.15rem;
+        }
+        .sidebar-offcanvas .offcanvas-title {
+            font-weight: 800;
+            color: #fff;
+            letter-spacing: -.02em;
+        }
+        .sidebar-offcanvas .btn-close {
+            filter: invert(1);
+            opacity: .6;
+        }
+        .sidebar-offcanvas .offcanvas-body {
+            padding: .75rem .85rem 1.5rem;
+        }
+        .btn-sidebar-menu {
+            border-radius: 10px;
+            padding: .4rem .65rem;
+            border: 1px solid rgba(255, 255, 255, .15);
+            background: rgba(255, 255, 255, .06);
+            color: #fff;
+            transition: background .2s ease, border-color .2s ease;
+        }
+        .btn-sidebar-menu:hover {
+            background: rgba(255, 255, 255, .12);
+            border-color: rgba(255, 255, 255, .22);
+            color: #fff;
+        }
         .content-wrap { padding: 24px; }
         .page-header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom: 18px; }
         .page-title { font-size: 1.25rem; font-weight: 700; margin:0; letter-spacing: -.01em; }
@@ -59,9 +335,6 @@
         .btn { border-radius: 10px; }
         .form-control, .form-select { border-radius: 12px; }
         .alert { border-radius: 14px; }
-        .nav-section-label { font-size: .65rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.45); padding-left: .5rem; }
-        .sidebar .nav-link .nav-sub { font-size: .68rem; opacity: .65; margin-top: 2px; line-height: 1.2; }
-        .sidebar-team-badge { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); }
         .crm-pipeline-chrome { background: #fff; border-radius: 16px; padding: 1.25rem 1.5rem; border: 1px solid rgba(15,23,42,.08); box-shadow: 0 8px 24px rgba(15,23,42,.06); }
         .crm-pipeline-icon { width: 52px; height: 52px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 1.35rem; }
         .crm-pipeline-icon.talent { background: linear-gradient(135deg, #dbeafe, #eff6ff); color: #1d4ed8; }
@@ -134,6 +407,13 @@
         <div class="container-fluid px-3 px-lg-4">
             <div class="d-flex align-items-center justify-content-between py-3">
                 <div class="d-flex align-items-center gap-2">
+                    @auth('admin')
+                        <button class="btn btn-sidebar-menu d-lg-none" type="button"
+                                data-bs-toggle="offcanvas" data-bs-target="#sidebarOffcanvas"
+                                aria-controls="sidebarOffcanvas" aria-label="Open menu">
+                            <i class="bi bi-list fs-5"></i>
+                        </button>
+                    @endauth
                     <span class="brand-pill d-inline-flex align-items-center gap-2 px-3 py-2 rounded-3">
                         <i class="bi bi-shield-lock"></i>
                         <span class="fw-semibold">{{ config('app.name') }}</span>
@@ -161,6 +441,15 @@
     <div class="app-body flex-grow-1 d-flex">
         @auth('admin')
             @include('partials.admin-sidebar')
+            <div class="offcanvas offcanvas-start sidebar-offcanvas d-lg-none" tabindex="-1" id="sidebarOffcanvas" aria-labelledby="sidebarOffcanvasLabel">
+                <div class="offcanvas-header">
+                    <h5 class="offcanvas-title" id="sidebarOffcanvasLabel">Hirevoo CRM</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+                </div>
+                <div class="offcanvas-body">
+                    @include('partials.admin-sidebar-nav')
+                </div>
+            </div>
         @endauth
 
         <main class="app-main flex-grow-1">
@@ -189,6 +478,19 @@
         </main>
     </div>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    (function () {
+        const panel = document.getElementById('sidebarOffcanvas');
+        if (!panel) return;
+        panel.querySelectorAll('.sidebar-link').forEach(function (link) {
+            link.addEventListener('click', function () {
+                const instance = bootstrap.Offcanvas.getInstance(panel);
+                if (instance) instance.hide();
+            });
+        });
+    })();
+</script>
 @stack('scripts')
 </body>
 </html>

@@ -11,6 +11,11 @@
         <div class="text-end">
             <div class="text-muted small">Completed revenue</div>
             <div class="fw-bold fs-4">INR {{ number_format($revenue, 2) }}</div>
+            @if(auth('admin')->user()?->canPermission('employer_payments.view'))
+                <a href="{{ route('admin.employer-plan-payments.index') }}" class="btn btn-sm btn-outline-primary mt-2">
+                    Employer plan cheques
+                </a>
+            @endif
         </div>
     </div>
 

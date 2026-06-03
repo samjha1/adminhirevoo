@@ -3,6 +3,7 @@
 namespace App\Modules\Leads\Models;
 
 use App\Models\Admin;
+use App\Models\Hirevo\HirevoLead;
 use App\Modules\Leads\Enums\FollowUpStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -16,6 +17,7 @@ class CrmFollowUp extends Model
 
     protected $fillable = [
         'lead_id',
+        'employer_prospect_id',
         'admin_id',
         'scheduled_at',
         'status',
@@ -35,5 +37,20 @@ class CrmFollowUp extends Model
     public function admin(): BelongsTo
     {
         return $this->belongsTo(Admin::class);
+    }
+
+    public function lead(): BelongsTo
+    {
+        return $this->belongsTo(HirevoLead::class, 'lead_id');
+    }
+
+    public function employerProspect(): BelongsTo
+    {
+        return $this->belongsTo(CrmEmployerProspect::class, 'employer_prospect_id');
+    }
+
+    public function isForCompany(): bool
+    {
+        return $this->employer_prospect_id !== null;
     }
 }

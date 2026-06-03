@@ -6,6 +6,7 @@ enum CompanyB2bPipelineStage: string
 {
     case LeadGenerated = 'lead_generated';
     case Contacted = 'contacted';
+    case FollowUp = 'follow_up';
     case Interested = 'interested';
     case MeetingScheduled = 'meeting_scheduled';
     case DemoCompleted = 'demo_completed';
@@ -23,6 +24,7 @@ enum CompanyB2bPipelineStage: string
         return [
             self::LeadGenerated,
             self::Contacted,
+            self::FollowUp,
             self::Interested,
             self::MeetingScheduled,
             self::DemoCompleted,
@@ -46,6 +48,7 @@ enum CompanyB2bPipelineStage: string
         return match ($this) {
             self::LeadGenerated => 'Lead generated',
             self::Contacted => 'Contacted',
+            self::FollowUp => 'Follow up',
             self::Interested => 'Interested',
             self::MeetingScheduled => 'Meeting scheduled',
             self::DemoCompleted => 'Demo completed',
@@ -63,7 +66,7 @@ enum CompanyB2bPipelineStage: string
     public function winProbability(): int
     {
         return match ($this) {
-            self::LeadGenerated, self::Contacted, self::Interested => 10,
+            self::LeadGenerated, self::Contacted, self::FollowUp, self::Interested => 10,
             self::MeetingScheduled => 20,
             self::DemoCompleted => 30,
             self::ProposalSent => 50,

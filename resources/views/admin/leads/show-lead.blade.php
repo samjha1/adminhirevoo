@@ -362,15 +362,19 @@
                         <div class="crm-card">
                             <div class="crm-card-hd">Pipeline stage</div>
                             <div class="crm-card-bd">
-                                <form method="POST" action="{{ route('admin.leads.stage', $lead->id) }}">
+                                <form method="POST" action="{{ route('admin.leads.stage', $lead->id) }}" data-crm-stage-form>
                                     @csrf
                                     <div class="mb-2">
-                                        <select class="form-select form-select-sm" name="stage">
+                                        <select class="form-select form-select-sm" name="stage"
+                                                data-crm-stage-select
+                                                data-follow-up-value="follow_up"
+                                                data-interview-value="interview">
                                             @foreach($stages as $stage)
                                                 <option value="{{ $stage }}" @selected($currentStage === $stage)>{{ $crmStageLabels[$stage] ?? $stage }}</option>
                                             @endforeach
                                         </select>
                                     </div>
+                                    @include('partials.crm-follow-up-stage-fields')
                                     <div class="mb-2">
                                         <input type="text" class="form-control form-control-sm" name="notes"
                                                value="{{ $lead->adminStage?->notes }}"
@@ -378,6 +382,7 @@
                                     </div>
                                     <button type="submit" class="btn btn-primary btn-sm w-100">Update stage</button>
                                 </form>
+                                @include('partials.crm-stage-schedule-script')
                             </div>
                         </div>
                     @endcan

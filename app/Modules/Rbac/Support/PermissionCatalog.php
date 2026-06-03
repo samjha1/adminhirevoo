@@ -39,6 +39,8 @@ final class PermissionCatalog
             ['slug' => 'platform.jobs', 'group' => 'platform', 'name' => 'Manage jobs'],
             ['slug' => 'platform.referrals', 'group' => 'platform', 'name' => 'Manage referrals'],
             ['slug' => 'platform.payments', 'group' => 'platform', 'name' => 'View payments'],
+            ['slug' => 'employer_payments.view', 'group' => 'platform', 'name' => 'View employer plan payments'],
+            ['slug' => 'employer_payments.complete', 'group' => 'platform', 'name' => 'Verify employer plan cheques'],
             ['slug' => 'platform.sponsored_ads', 'group' => 'platform', 'name' => 'Moderate sponsored ads'],
         ];
     }
@@ -54,18 +56,18 @@ final class PermissionCatalog
             'marketing' => [
                 'leads.view', 'leads.view_all', 'leads.create', 'leads.import', 'leads.export',
                 'leads.assign_manager', 'leads.reassign', 'leads.release', 'consultations.view',
-                'analytics.view', 'applications.view',
+                'analytics.view', 'applications.view', 'employer_payments.view',
             ],
             'sales_manager' => [
                 'leads.view', 'leads.assign_employee', 'leads.reassign', 'leads.update_stage',
                 'leads.update_sales_status', 'leads.log_call', 'leads.manage_followups',
                 'leads.take_back', 'kanban.view', 'staff.view', 'staff.manage', 'analytics.view',
-                'applications.view',
+                'applications.view', 'employer_payments.view',
             ],
             'sales_employee' => [
                 'leads.view', 'leads.update_stage', 'leads.update_sales_status',
                 'leads.log_call', 'leads.manage_followups', 'kanban.view', 'analytics.view',
-                'applications.view',
+                'applications.view', 'employer_payments.view',
             ],
         ];
     }

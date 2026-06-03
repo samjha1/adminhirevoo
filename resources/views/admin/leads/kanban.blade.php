@@ -26,9 +26,14 @@
                             </a>
                             <div class="text-muted small">{{ $lead->assignedTo?->name ?? 'Unassigned' }}</div>
                             @can('updateCrmStage', $lead)
-                            <form method="POST" action="{{ route('admin.leads.kanban-stage', $lead) }}" class="mt-2">
+                            <form method="POST" action="{{ route('admin.leads.kanban-stage', $lead) }}" class="mt-2"
+                                  data-kanban-stage-form
+                                  data-detail-url="{{ route('admin.leads.show', $lead) }}">
                                 @csrf
-                                <select name="stage" class="form-select form-select-sm" onchange="this.form.submit()">
+                                <select name="stage" class="form-select form-select-sm"
+                                        data-kanban-stage-select
+                                        data-follow-up-value="follow_up"
+                                        data-interview-value="interview">
                                     @foreach($stages as $s)
                                         <option value="{{ $s }}" @selected(($lead->adminStage?->stage ?? 'new') === $s)>{{ $s }}</option>
                                     @endforeach
@@ -41,4 +46,5 @@
             </div>
         @endforeach
     </div>
+    @include('partials.crm-kanban-follow-up-guard')
 @endsection

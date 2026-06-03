@@ -19,6 +19,8 @@ class HirevoReferrerProfile extends Model
             'invoice_consent' => 'boolean',
             'is_approved' => 'boolean',
             'approved_at' => 'datetime',
+            'subscription_started_at' => 'datetime',
+            'subscription_expires_at' => 'datetime',
         ];
     }
 
