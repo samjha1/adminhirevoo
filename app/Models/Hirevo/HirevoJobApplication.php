@@ -15,5 +15,10 @@ class HirevoJobApplication extends Model
     {
         return $this->belongsTo(HirevoUser::class, 'user_id');
     }
+
+    public function jobRole(): BelongsTo
+    {
+        return $this->belongsTo(HirevoJobRole::class, 'job_role_id');
+    }
 }
 

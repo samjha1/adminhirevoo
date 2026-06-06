@@ -129,7 +129,55 @@
         </div>
     @endif
 
-    @if($can('staff.view') || $can('staff.manage') || $can('audit.view') || $can('rbac.manage_permissions') || ($can('employer_payments.view') && ! $showCompany))
+    @if($can('portal.dashboard.view') || $can('portal.jobs.view') || $can('portal.applications.view') || $can('portal.reports.view'))
+        <div class="sidebar-group sidebar-group--portal">
+            <div class="sidebar-group-label">
+                <i class="bi bi-briefcase"></i>
+                <span>Job Portal</span>
+            </div>
+            <div class="sidebar-group-links">
+                @if($can('portal.dashboard.view'))
+                    <a class="sidebar-link @if(request()->routeIs('admin.portal.dashboard')) is-active @endif"
+                       href="{{ route('admin.portal.dashboard') }}">
+                        <span class="sidebar-link-icon"><i class="bi bi-speedometer2"></i></span>
+                        <span class="sidebar-link-text">
+                            <span class="sidebar-link-label">Dashboard</span>
+                            <span class="sidebar-link-sub">Platform analytics</span>
+                        </span>
+                    </a>
+                @endif
+                @if($can('portal.jobs.view') || $can('platform.jobs'))
+                    <a class="sidebar-link @if(request()->routeIs('admin.jobs.*')) is-active @endif"
+                       href="{{ route('admin.jobs.index') }}">
+                        <span class="sidebar-link-icon"><i class="bi bi-briefcase"></i></span>
+                        <span class="sidebar-link-text">
+                            <span class="sidebar-link-label">Jobs</span>
+                        </span>
+                    </a>
+                @endif
+                @if($can('portal.applications.view') || $can('applications.view'))
+                    <a class="sidebar-link @if(request()->routeIs('admin.applications.*', 'admin.portal.applications.*')) is-active @endif"
+                       href="{{ $can('leads.view') ? route('admin.applications.index') : route('admin.portal.applications.index') }}">
+                        <span class="sidebar-link-icon"><i class="bi bi-file-earmark-person"></i></span>
+                        <span class="sidebar-link-text">
+                            <span class="sidebar-link-label">Applications</span>
+                        </span>
+                    </a>
+                @endif
+                @if($can('portal.reports.view'))
+                    <a class="sidebar-link @if(request()->routeIs('admin.reports.*')) is-active @endif"
+                       href="{{ route('admin.reports.index') }}">
+                        <span class="sidebar-link-icon"><i class="bi bi-bar-chart-line"></i></span>
+                        <span class="sidebar-link-text">
+                            <span class="sidebar-link-label">Reports</span>
+                        </span>
+                    </a>
+                @endif
+            </div>
+        </div>
+    @endif
+
+    @if($can('staff.view') || $can('staff.manage') || $can('audit.view') || $can('rbac.manage_permissions') || $can('portal.roles.view') || ($can('employer_payments.view') && ! $showCompany))
         <div class="sidebar-group">
             <div class="sidebar-group-label">
                 <i class="bi bi-gear"></i>

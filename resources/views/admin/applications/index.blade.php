@@ -1,218 +1,208 @@
 @extends('layouts.app')
 
-@section('title', 'Applied Jobs')
+@section('title', 'Applications')
 
 @section('content')
-    <style>
-        .applied-jobs-tools { justify-content: flex-end; }
-        .applied-jobs-footer {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            padding: 12px 16px;
-            border-top: 1px solid rgba(15, 23, 42, .08);
-            background: #fff;
-            border-bottom-left-radius: 14px;
-            border-bottom-right-radius: 14px;
-        }
-        .applied-jobs-page-meta { color: #6b7280; font-size: .875rem; }
-        .applied-jobs-page-meta strong { color: #334155; }
-        .applied-jobs-pagination {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-            justify-content: flex-end;
-        }
-        .applied-jobs-page-count {
-            font-size: .8rem;
-            color: #64748b;
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 999px;
-            padding: .3rem .65rem;
-        }
-        .applied-jobs-pagination-list {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            margin: 0;
-            padding: 0;
-            list-style: none;
-        }
-        .applied-jobs-pagination-list a,
-        .applied-jobs-pagination-list span {
-            min-width: 34px;
-            height: 34px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 8px;
-            border: 1px solid #e2e8f0;
-            text-decoration: none;
-            font-size: .85rem;
-            color: #334155;
-            background: #fff;
-            padding: 0 .6rem;
-        }
-        .applied-jobs-pagination-list a:hover {
-            background: #eff6ff;
-            border-color: #93c5fd;
-            color: #1d4ed8;
-        }
-        .applied-jobs-pagination-list .is-active span {
-            color: #fff;
-            background: #2563eb;
-            border-color: #2563eb;
-            font-weight: 600;
-        }
-        .applied-jobs-pagination-list .is-disabled span {
-            opacity: .45;
-            cursor: default;
-            background: #f8fafc;
-        }
-        @media (max-width: 991px) {
-            .applied-jobs-footer { flex-direction: column; align-items: flex-start; }
-            .applied-jobs-pagination { justify-content: flex-start; }
-        }
-    </style>
-    <div class="page-header">
-        <div>
-            <h1 class="page-title">Applied Jobs</h1>
-            <div class="page-subtitle">See who applied to which company and role.</div>
-        </div>
-        <form class="d-flex flex-wrap gap-2 applied-jobs-tools" method="GET" action="{{ route('admin.applications.index') }}">
-            <input type="search"
-                   class="form-control"
-                   name="q"
-                   value="{{ request('q') }}"
-                   placeholder="Search candidate, company, role, email"
-                   style="min-width: 280px;">
-            <select class="form-select" name="status" style="width: 170px;">
-                <option value="">All status</option>
-                <option value="qualified" @selected(request('status') === 'qualified')>Qualified</option>
-            </select>
-            <input type="date"
-                   class="form-control"
-                   name="date_from"
-                   value="{{ request('date_from') }}"
-                   style="width: 165px;"
-                   title="From date">
-            <input type="date"
-                   class="form-control"
-                   name="date_to"
-                   value="{{ request('date_to') }}"
-                   style="width: 165px;"
-                   title="To date">
-            <button class="btn btn-primary">Filter</button>
-            @if(request()->filled('q') || request()->filled('status') || request()->filled('date_from') || request()->filled('date_to'))
-                <a href="{{ route('admin.applications.index') }}" class="btn btn-outline-secondary">Reset</a>
-            @endif
-        </form>
-    </div>
+    @include('partials.portal-ui')
 
-    <div class="card shadow-soft">
-        <div class="table-responsive">
-            <table class="table align-middle mb-0">
-                <thead>
-                <tr>
-                    <th>Candidate</th>
-                    <th>Company</th>
-                    <th>Role</th>
-                    <th>Contact</th>
-                    <th>AI Resume Summary</th>
-                    <th>Match %</th>
-                    <th>Status</th>
-                    <th>Applied On</th>
-                </tr>
-                </thead>
-                <tbody>
-                @forelse($applications as $application)
-                    @php
-                        $candidate = $application->candidate;
-                        $job = $application->job;
-                        $employer = $job?->employer;
-                        $companyName = $employer?->referrerProfile?->company_name ?: $employer?->name ?: '—';
-                    @endphp
-                    <tr>
-                        <td>
-                            @if($candidate?->name)
-                                <a href="{{ route('admin.applications.show', $application->id) }}" class="text-decoration-none fw-semibold">
-                                    {{ $candidate->name }}
-                                </a>
-                            @else
-                                —
-                            @endif
-                        </td>
-                        <td>{{ $companyName }}</td>
-                        <td>{{ $job?->title ?? '—' }}</td>
-                        <td>
-                            <div>{{ $candidate?->email ?? '—' }}</div>
-                            @if($candidate?->phone)
-                                <div class="small text-muted">{{ $candidate->phone }}</div>
-                            @endif
-                        </td>
-                        <td style="max-width: 320px;">
-                            <div class="small text-muted">
-                                {{ \Illuminate\Support\Str::limit($application->ai_resume_summary ?: 'No AI summary available.', 180) }}
-                            </div>
-                        </td>
-                        <td>
-                            <span class="badge text-bg-primary">{{ (int) ($application->profile_match_percent ?? 0) }}%</span>
-                        </td>
-                        <td>
-                            <form method="POST" action="{{ route('admin.applications.status', $application->id) }}" class="d-flex gap-2 align-items-center">
-                                @csrf
-                                <input type="hidden" name="status" value="qualified">
-                                @if($application->status === 'qualified')
-                                    <span class="badge text-bg-success">Qualified</span>
-                                @else
-                                    <button type="submit" class="btn btn-sm btn-outline-success">Mark Qualified</button>
-                                @endif
-                            </form>
-                        </td>
-                        <td class="text-muted">{{ $application->created_at?->format('Y-m-d H:i') ?? '—' }}</td>
-                    </tr>
-                @empty
-                    <tr><td colspan="8" class="text-center text-muted py-4">No applied jobs found.</td></tr>
-                @endforelse
-                </tbody>
-            </table>
+    @php
+        $stats = $stats ?? [];
+        $dateFilter = $dateFilter ?? \App\Support\PortalDateFilter::fromRequest(request());
+        $appRoute = Route::has('admin.portal.applications.index') && !auth('admin')->user()->canPermission('leads.view')
+            ? 'admin.portal.applications.index'
+            : 'admin.applications.index';
+        $showRoute = $appRoute === 'admin.portal.applications.index' ? 'admin.portal.applications.show' : 'admin.applications.show';
+        $statusRoute = $appRoute === 'admin.portal.applications.index' ? 'admin.portal.applications.status' : 'admin.applications.status';
+        $hasFilters = request()->filled('q') || request()->filled('status') || request()->filled('company_id')
+            || request()->filled('job_id') || $dateFilter->isActive();
+    @endphp
+
+    <div class="portal-page">
+        @include('partials.portal-nav', ['active' => 'applications'])
+
+        <div class="portal-hero d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+            <div>
+                <div class="portal-hero-kicker">Job Portal</div>
+                <h1 class="portal-hero-title">Applications</h1>
+                <p class="portal-hero-sub">Track who applied, for which role, and update hiring status in one place.</p>
+            </div>
+            <div class="portal-hero-actions">
+                <span class="badge rounded-pill bg-light text-dark px-3 py-2 fw-semibold">
+                    <i class="bi bi-send-check me-1"></i>{{ number_format($applications->total()) }} applications
+                </span>
+            </div>
         </div>
-        <div class="applied-jobs-footer">
-            <div class="applied-jobs-page-meta">
-                @if($applications->total() > 0)
-                    Showing <strong>{{ $applications->firstItem() }}</strong> to <strong>{{ $applications->lastItem() }}</strong> of <strong>{{ $applications->total() }}</strong> entries
-                @else
-                    Showing 0 entries
+
+        @include('partials.portal-mini-stats', ['items' => [
+            ['label' => 'Total', 'value' => $stats['total'] ?? 0, 'icon' => 'bi-inboxes', 'tone' => 'indigo'],
+            ['label' => 'Today', 'value' => $stats['today'] ?? 0, 'icon' => 'bi-sun', 'tone' => 'amber'],
+            ['label' => 'This week', 'value' => $stats['weekly'] ?? 0, 'icon' => 'bi-calendar-week', 'tone' => 'emerald'],
+            ['label' => 'This month', 'value' => $stats['monthly'] ?? 0, 'icon' => 'bi-calendar-month', 'tone' => 'violet'],
+        ]])
+
+        <div class="portal-filters-card">
+            <div class="portal-filters-head">
+                <h2><i class="bi bi-funnel text-primary"></i> Search &amp; filters</h2>
+                @if($hasFilters)
+                    <a href="{{ route($appRoute) }}" class="btn btn-sm btn-link text-decoration-none">Reset all</a>
                 @endif
             </div>
-            <div class="applied-jobs-pagination">
-                <span class="applied-jobs-page-count">Page {{ $applications->currentPage() }} of {{ $applications->lastPage() }}</span>
-                <ul class="applied-jobs-pagination-list">
-                    @if($applications->onFirstPage())
-                        <li class="is-disabled"><span>&laquo;</span></li>
-                    @else
-                        <li><a href="{{ $applications->previousPageUrl() }}" aria-label="Previous page">&laquo;</a></li>
+            <form method="GET" action="{{ route($appRoute) }}" class="portal-filters-body">
+                <div class="row g-3 align-items-end">
+                    <div class="col-12 col-lg-4">
+                        <label class="form-label">Search</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+                            <input type="search" class="form-control" name="q" value="{{ request('q') }}"
+                                   placeholder="Candidate, company, or job title…">
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-4 col-lg-2">
+                        <label class="form-label">Status</label>
+                        <select class="form-select" name="status">
+                            <option value="">All statuses</option>
+                            @foreach(['applied','shortlisted','interviewed','offered','hired','rejected','qualified'] as $st)
+                                <option value="{{ $st }}" @selected(request('status') === $st)>{{ ucfirst($st) }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    @if(isset($filterCompanies))
+                        <div class="col-6 col-md-4 col-lg-2">
+                            <label class="form-label">Company</label>
+                            <select name="company_id" class="form-select">
+                                <option value="">All companies</option>
+                                @foreach($filterCompanies as $co)
+                                    <option value="{{ $co->id }}" @selected((int)request('company_id') === $co->id)>{{ \Illuminate\Support\Str::limit($co->name, 28) }}</option>
+                                @endforeach
+                            </select>
+                        </div>
                     @endif
-
-                    @foreach($applications->getUrlRange(max(1, $applications->currentPage() - 1), min($applications->lastPage(), $applications->currentPage() + 1)) as $page => $url)
-                        @if($page == $applications->currentPage())
-                            <li class="is-active"><span>{{ $page }}</span></li>
-                        @else
-                            <li><a href="{{ $url }}">{{ $page }}</a></li>
-                        @endif
-                    @endforeach
-
-                    @if($applications->hasMorePages())
-                        <li><a href="{{ $applications->nextPageUrl() }}" aria-label="Next page">&raquo;</a></li>
-                    @else
-                        <li class="is-disabled"><span>&raquo;</span></li>
+                    @if(isset($filterJobs))
+                        <div class="col-6 col-md-4 col-lg-2">
+                            <label class="form-label">Job</label>
+                            <select name="job_id" class="form-select">
+                                <option value="">All jobs</option>
+                                @foreach($filterJobs as $jo)
+                                    <option value="{{ $jo->id }}" @selected((int)request('job_id') === $jo->id)>{{ \Illuminate\Support\Str::limit($jo->title, 28) }}</option>
+                                @endforeach
+                            </select>
+                        </div>
                     @endif
-                </ul>
+                    <div class="col-6 col-md-4 col-lg-2">
+                        <label class="form-label">Time period</label>
+                        <select name="period" class="form-select portal-period-select">
+                            <option value="">All time</option>
+                            <option value="today" @selected($dateFilter->key === 'today')>Today</option>
+                            <option value="last_7_days" @selected($dateFilter->key === 'last_7_days')>Last 7 days</option>
+                            <option value="last_30_days" @selected($dateFilter->key === 'last_30_days')>Last 30 days</option>
+                            <option value="this_week" @selected($dateFilter->key === 'this_week')>This week</option>
+                            <option value="this_month" @selected($dateFilter->key === 'this_month')>This month</option>
+                            <option value="custom" @selected($dateFilter->key === 'custom')>Custom</option>
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-4 col-lg-2 portal-custom-dates @if($dateFilter->key !== 'custom') d-none @endif">
+                        <label class="form-label">From</label>
+                        <input type="date" name="date_from" class="form-control" value="{{ request('date_from') }}">
+                    </div>
+                    <div class="col-6 col-md-4 col-lg-2 portal-custom-dates @if($dateFilter->key !== 'custom') d-none @endif">
+                        <label class="form-label">To</label>
+                        <input type="date" name="date_to" class="form-control" value="{{ request('date_to') }}">
+                    </div>
+                    <div class="col-12 col-lg-auto ms-lg-auto">
+                        <button class="btn btn-primary px-4" type="submit" style="border-radius:10px;">
+                            <i class="bi bi-check2 me-1"></i>Apply
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="portal-table-card">
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead>
+                    <tr>
+                        <th>Candidate</th>
+                        <th>Company</th>
+                        <th>Job role</th>
+                        <th>Contact</th>
+                        <th>Match</th>
+                        <th>Status</th>
+                        <th>Applied</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @forelse($applications as $application)
+                        @php
+                            $candidate = $application->candidate;
+                            $job = $application->job;
+                            $employer = $job?->employer;
+                            $companyName = $employer?->referrerProfile?->company_name ?: $employer?->name ?: '—';
+                            $status = $application->status ?? 'applied';
+                        @endphp
+                        <tr>
+                            <td>
+                                @if($candidate?->name)
+                                    <a href="{{ route($showRoute, $application->id) }}" class="fw-semibold text-decoration-none">
+                                        {{ $candidate->name }}
+                                    </a>
+                                @else
+                                    <span class="text-muted">—</span>
+                                @endif
+                            </td>
+                            <td>{{ $companyName }}</td>
+                            <td>
+                                <div class="fw-medium">{{ $job?->title ?? '—' }}</div>
+                                <div class="small text-muted text-truncate" style="max-width:200px">
+                                    {{ \Illuminate\Support\Str::limit($application->ai_resume_summary ?: 'No AI summary', 60) }}
+                                </div>
+                            </td>
+                            <td class="small">
+                                <div>{{ $candidate?->email ?? '—' }}</div>
+                                @if($candidate?->phone)<div class="text-muted">{{ $candidate->phone }}</div>@endif
+                            </td>
+                            <td><span class="portal-match-badge">{{ (int) ($application->profile_match_percent ?? 0) }}%</span></td>
+                            <td>
+                                <form method="POST" action="{{ route($statusRoute, $application->id) }}" class="d-flex gap-1 align-items-center">
+                                    @csrf
+                                    <select name="status" class="form-select form-select-sm" style="width:118px;border-radius:8px;">
+                                        @foreach(['applied','shortlisted','interviewed','offered','hired','rejected','qualified'] as $st)
+                                            <option value="{{ $st }}" @selected($status === $st)>{{ ucfirst($st) }}</option>
+                                        @endforeach
+                                    </select>
+                                    <button type="submit" class="btn btn-sm btn-outline-primary" style="border-radius:8px;">Save</button>
+                                </form>
+                            </td>
+                            <td class="text-muted small">{{ $application->created_at?->format('M j, Y') }}</td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="7">
+                                <div class="portal-empty">
+                                    <i class="bi bi-inbox"></i>
+                                    No applications match your filters.
+                                </div>
+                            </td>
+                        </tr>
+                    @endforelse
+                    </tbody>
+                </table>
             </div>
+            @include('partials.crm-pagination-footer', ['paginator' => $applications])
         </div>
     </div>
 @endsection
 
+@push('scripts')
+<script>
+    document.querySelectorAll('.portal-period-select').forEach(function (sel) {
+        sel.addEventListener('change', function () {
+            const form = sel.closest('form');
+            if (!form) return;
+            form.querySelectorAll('.portal-custom-dates').forEach(function (el) {
+                el.classList.toggle('d-none', sel.value !== 'custom');
+            });
+        });
+    });
+</script>
+@endpush

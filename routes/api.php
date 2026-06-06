@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\LeadCallApiController;
 use App\Http\Controllers\Api\V1\LeadFollowUpApiController;
 use App\Http\Controllers\Api\V1\LeadTimelineApiController;
 use App\Http\Controllers\Api\V1\MePermissionsController;
+use App\Http\Controllers\Api\V1\PortalApiController;
 use App\Http\Controllers\Api\V1\StaffUserController;
 use Illuminate\Support\Facades\Route;
 
@@ -68,5 +69,22 @@ Route::prefix('v1')->group(function () {
 
         Route::get('/consultations', [ConsultationApiController::class, 'index'])
             ->middleware('permission:consultations.view');
+
+        Route::prefix('portal')->middleware('permission:portal.dashboard.view|portal.reports.view')->group(function () {
+            Route::get('/metrics', [PortalApiController::class, 'metrics'])
+                ->middleware('permission:portal.dashboard.view');
+            Route::get('/summary', [PortalApiController::class, 'summary'])
+                ->middleware('permission:portal.dashboard.view');
+            Route::get('/charts', [PortalApiController::class, 'charts'])
+                ->middleware('permission:portal.dashboard.view');
+            Route::get('/recent-activities', [PortalApiController::class, 'recentActivities'])
+                ->middleware('permission:portal.dashboard.view');
+            Route::get('/recent-companies', [PortalApiController::class, 'recentCompanies'])
+                ->middleware('permission:portal.dashboard.view');
+            Route::get('/recent-jobs', [PortalApiController::class, 'recentJobs'])
+                ->middleware('permission:portal.dashboard.view');
+            Route::get('/reports', [PortalApiController::class, 'reports'])
+                ->middleware('permission:portal.reports.view');
+        });
     });
 });

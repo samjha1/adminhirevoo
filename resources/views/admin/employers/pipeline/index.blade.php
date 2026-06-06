@@ -177,7 +177,8 @@
 @section('content')
     @php
         $me = auth('admin')->user();
-        $hasFilters = request()->filled('q') || request()->filled('pipeline_stage') || request()->filled('assignment_status');
+        $dateFilter = $dateFilter ?? \App\Support\PortalDateFilter::fromRequest(request());
+        $hasFilters = request()->filled('q') || request()->filled('pipeline_stage') || request()->filled('assignment_status') || $dateFilter->isActive();
         $filterBase = request()->except(['page', 'pipeline_stage']);
         $stageTotal = array_sum($stageCounts ?? []);
         $lostCount = (int) ($stageCounts[\App\Enums\CompanyB2bPipelineStage::Lost->value] ?? 0);
@@ -264,6 +265,11 @@
                         Assignment: {{ str_replace('_', ' ', request('assignment_status')) }} <i class="bi bi-x-lg"></i>
                     </a>
                 @endif
+                @if($dateFilter->isActive())
+                    <a class="company-filter-chip" href="{{ route('admin.employers.pipeline.index', request()->except(['period', 'date_from', 'date_to', 'page'])) }}">
+                        Date: {{ $dateFilter->label() }} <i class="bi bi-x-lg"></i>
+                    </a>
+                @endif
                 <a href="{{ route('admin.employers.pipeline.index') }}" class="company-filter-chip bg-white text-secondary border-secondary-subtle">
                     Clear all
                 </a>
@@ -278,8 +284,11 @@
                 @endif
             </div>
             <form method="GET" action="{{ route('admin.employers.pipeline.index') }}" class="company-filters-body">
+                @if(request('pipeline_stage'))
+                    <input type="hidden" name="pipeline_stage" value="{{ request('pipeline_stage') }}">
+                @endif
                 <div class="row g-3 align-items-end">
-                    <div class="col-12 col-lg-5">
+                    <div class="col-12 col-lg-4">
                         <label class="form-label">Search</label>
                         <div class="input-group">
                             <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
@@ -305,6 +314,7 @@
                             @endforeach
                         </select>
                     </div>
+                    @include('partials.crm-date-filter-fields', ['dateFilter' => $dateFilter])
                     <div class="col-12 col-lg-auto ms-lg-auto">
                         <button type="submit" class="btn btn-success w-100 w-lg-auto px-4">
                             <i class="bi bi-check2 me-1"></i>Apply

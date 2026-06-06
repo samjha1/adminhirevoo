@@ -21,6 +21,9 @@ use App\Http\Controllers\Admin\SponsoredAdController;
 use App\Http\Controllers\Admin\Staff\AdminStaffController;
 use App\Http\Controllers\Admin\Users\HirevoUserController;
 use App\Http\Controllers\Admin\ApplicationController;
+use App\Http\Controllers\Admin\Portal\CandidateController;
+use App\Http\Controllers\Admin\Portal\PortalDashboardController;
+use App\Http\Controllers\Admin\Portal\ReportController;
 use App\Modules\Leads\Services\HirevoLeadExportService;
 use App\Support\AdminHomeResolver;
 use Illuminate\Support\Facades\Route;
@@ -113,13 +116,13 @@ Route::middleware(['admin.guard', 'auth:admin', 'permission:leads.view', 'sales.
         ->middleware('permission:leads.manage_followups')
         ->name('admin.follow-ups.complete');
     Route::get('/applied-jobs', [ApplicationController::class, 'index'])
-        ->middleware('permission:applications.view')
+        ->middleware('permission:applications.view|portal.applications.view')
         ->name('admin.applications.index');
     Route::get('/applied-jobs/{application}', [ApplicationController::class, 'show'])
-        ->middleware('permission:applications.view')
+        ->middleware('permission:applications.view|portal.applications.view')
         ->name('admin.applications.show');
     Route::post('/applied-jobs/{application}/status', [ApplicationController::class, 'updateStatus'])
-        ->middleware('permission:applications.view')
+        ->middleware('permission:applications.view|portal.applications.update_status')
         ->name('admin.applications.status');
 });
 
@@ -214,32 +217,61 @@ Route::middleware(['admin.guard', 'auth:admin', 'permission:rbac.manage_permissi
     Route::put('/settings/roles/{role}', [RbacSettingsController::class, 'update'])->name('admin.settings.rbac.update');
 });
 
-Route::middleware(['admin.guard', 'auth:admin', 'role:admin|super_admin'])->group(function () {
+Route::middleware(['admin.guard', 'auth:admin', 'permission:portal.dashboard.view'])->group(function () {
+    Route::get('/portal', [PortalDashboardController::class, 'index'])->name('admin.portal.dashboard');
+});
+
+Route::middleware(['admin.guard', 'auth:admin', 'permission:portal.candidates.view|portal.candidates.profile'])->group(function () {
+    Route::get('/candidates', [CandidateController::class, 'index'])
+        ->middleware('permission:portal.candidates.view')
+        ->name('admin.candidates.index');
+    Route::get('/candidates/{candidate}', [CandidateController::class, 'show'])
+        ->middleware('permission:portal.candidates.profile')
+        ->name('admin.candidates.show');
+});
+
+Route::middleware(['admin.guard', 'auth:admin', 'permission:portal.reports.view'])->group(function () {
+    Route::get('/reports', [ReportController::class, 'index'])->name('admin.reports.index');
+    Route::get('/reports/export', [ReportController::class, 'export'])
+        ->middleware('permission:portal.reports.export|analytics.export')
+        ->name('admin.reports.export');
+});
+
+Route::middleware(['admin.guard', 'auth:admin', 'permission:portal.applications.view'])->group(function () {
+    Route::get('/portal/applications', [ApplicationController::class, 'index'])->name('admin.portal.applications.index');
+    Route::get('/portal/applications/{application}', [ApplicationController::class, 'show'])
+        ->name('admin.portal.applications.show');
+    Route::post('/portal/applications/{application}/status', [ApplicationController::class, 'updateStatus'])
+        ->middleware('permission:portal.applications.update_status')
+        ->name('admin.portal.applications.status');
+});
+
+Route::middleware(['admin.guard', 'auth:admin', 'role:admin|super_admin|recruiter'])->group(function () {
     Route::get('/users', [HirevoUserController::class, 'index'])
-        ->middleware('permission:platform.users')
+        ->middleware('permission:platform.users|portal.users.view')
         ->name('admin.users.index');
     Route::post('/users/{user}/status', [HirevoUserController::class, 'updateStatus'])
         ->middleware('permission:platform.users')
         ->name('admin.users.status');
 
     Route::get('/employers', [EmployerController::class, 'index'])
-        ->middleware('permission:platform.employers')
+        ->middleware('permission:platform.employers|portal.companies.view')
         ->name('admin.employers.index');
     Route::get('/employers/{employer}', [EmployerController::class, 'show'])
-        ->middleware('permission:platform.employers')
+        ->middleware('permission:platform.employers|portal.companies.view')
         ->name('admin.employers.show');
     Route::post('/employers/{employer}/approve', [EmployerController::class, 'approve'])
-        ->middleware('permission:platform.employers')
+        ->middleware('permission:platform.employers|portal.companies.edit')
         ->name('admin.employers.approve');
     Route::post('/employers/{employer}/reject', [EmployerController::class, 'reject'])
-        ->middleware('permission:platform.employers')
+        ->middleware('permission:platform.employers|portal.companies.edit')
         ->name('admin.employers.reject');
 
     Route::get('/jobs', [JobController::class, 'index'])
-        ->middleware('permission:platform.jobs')
+        ->middleware('permission:platform.jobs|portal.jobs.view')
         ->name('admin.jobs.index');
     Route::post('/jobs/{job}/status', [JobController::class, 'updateStatus'])
-        ->middleware('permission:platform.jobs')
+        ->middleware('permission:platform.jobs|portal.jobs.edit')
         ->name('admin.jobs.status');
 
     Route::get('/referrals', [ReferralController::class, 'index'])

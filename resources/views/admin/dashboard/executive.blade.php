@@ -33,6 +33,16 @@
 
     @include('partials.dashboard-period-filter', ['period' => $period])
 
+    @if(!empty($portalStats) && auth('admin')->user()->canPermission('portal.dashboard.view'))
+        <div class="mb-4">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <h2 class="h6 fw-bold text-muted text-uppercase mb-0">Job Portal · Platform stats</h2>
+                <a href="{{ route('admin.portal.dashboard') }}" class="btn btn-sm btn-outline-primary">Full portal dashboard</a>
+            </div>
+            @include('partials.portal-stat-cards', ['stats' => $portalStats])
+        </div>
+    @endif
+
     <div class="row g-3 mb-4">
         <div class="col-lg-6">
             <div class="card shadow-soft h-100 border-primary border-opacity-25">

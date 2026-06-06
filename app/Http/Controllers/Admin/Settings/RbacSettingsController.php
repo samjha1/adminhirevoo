@@ -7,14 +7,31 @@ use App\Models\Admin;
 use App\Modules\Rbac\Models\CrmPermission;
 use App\Modules\Rbac\Models\CrmRole;
 use App\Modules\Rbac\Services\PermissionResolver;
+use App\Modules\Rbac\Services\RbacCatalogSyncService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class RbacSettingsController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, RbacCatalogSyncService $sync): View
     {
+        if (! $sync->tablesExist()) {
+            return view('admin.settings.rbac.index', [
+                'roles' => collect(),
+                'permissionsByGroup' => collect(),
+                'totalPermissions' => 0,
+                'permissionGroups' => $this->permissionGroupMeta(),
+                'adminCountsByRole' => collect(),
+                'selectedRole' => null,
+                'rbacSetupRequired' => 'migrate',
+            ]);
+        }
+
+        if ($sync->isEmpty()) {
+            $sync->sync();
+        }
+
         $roles = CrmRole::query()->with('permissions')->orderBy('name')->get();
         $permissions = CrmPermission::query()->orderBy('group')->orderBy('name')->get();
         $permissionsByGroup = $permissions->groupBy('group');
@@ -73,11 +90,17 @@ class RbacSettingsController extends Controller
                 'description' => 'Hirevo users, jobs, employers, referrals, payments.',
                 'order' => 5,
             ],
+            'portal' => [
+                'label' => 'Job Portal',
+                'icon' => 'bi-briefcase',
+                'description' => 'Dashboard, jobs, applications, and reports.',
+                'order' => 6,
+            ],
             'settings' => [
                 'label' => 'Settings',
                 'icon' => 'bi-gear',
                 'description' => 'General configuration access.',
-                'order' => 6,
+                'order' => 7,
             ],
         ];
     }

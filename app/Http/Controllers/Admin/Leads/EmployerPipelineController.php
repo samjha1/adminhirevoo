@@ -18,6 +18,7 @@ use App\Services\EmployerProspectAssignmentService;
 use App\Services\EmployerProspectSyncService;
 use App\Services\EmployerProspectVisibilityService;
 use App\Services\SalesTeamService;
+use App\Support\PortalDateFilter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -39,7 +40,9 @@ class EmployerPipelineController extends Controller
     {
         $this->syncIfStale();
         $admin = $request->user('admin');
+        $dateFilter = PortalDateFilter::fromRequest($request);
         $query = $this->baseQuery($admin);
+        $dateFilter->apply($query);
 
         if ($request->filled('pipeline_stage')) {
             $query->where('pipeline_stage', $request->string('pipeline_stage')->toString());
@@ -51,7 +54,7 @@ class EmployerPipelineController extends Controller
 
         $prospects = $query->paginate(15)->withQueryString();
 
-        return view('admin.employers.pipeline.index', $this->indexPayload($admin, $prospects));
+        return view('admin.employers.pipeline.index', $this->indexPayload($admin, $prospects, $dateFilter));
     }
 
     public function kanban(Request $request): View
@@ -242,13 +245,14 @@ class EmployerPipelineController extends Controller
     }
 
     /** @return array<string, mixed> */
-    private function indexPayload(Admin $admin, $prospects): array
+    private function indexPayload(Admin $admin, $prospects, PortalDateFilter $dateFilter): array
     {
         $stageLabels = $this->b2bPipeline->stageLabels();
-        $stageCounts = $this->stageCountsFor($admin);
+        $stageCounts = $this->stageCountsFor($admin, $dateFilter);
 
         return [
             'prospects' => $prospects,
+            'dateFilter' => $dateFilter,
             'pipeline' => SalesTeam::Employer,
             'assignableManagers' => $this->assignableManagers(),
             'assignableEmployees' => $this->assignableEmployees($admin),
@@ -265,10 +269,11 @@ class EmployerPipelineController extends Controller
     }
 
     /** @return array<string, int> */
-    private function stageCountsFor(Admin $admin): array
+    private function stageCountsFor(Admin $admin, ?PortalDateFilter $dateFilter = null): array
     {
         $query = CrmEmployerProspect::query();
         $this->visibility->restrictVisible($query, $admin);
+        $dateFilter?->apply($query);
 
         return $query
             ->selectRaw('pipeline_stage, COUNT(*) as aggregate')

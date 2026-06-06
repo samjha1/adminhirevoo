@@ -293,6 +293,126 @@
                     </div>
                 </div>
 
+                @php
+                    $currentJob = $lead->employerJob;
+                    $currentRole = $lead->jobRole;
+                    $currentCompany = $currentJob
+                        ? ($currentJob->employer?->referrerProfile?->company_name ?: $currentJob->company_name ?: $currentJob->employer?->name)
+                        : null;
+                @endphp
+
+                <div class="crm-card">
+                    <div class="crm-card-hd">
+                        <span><i class="bi bi-briefcase me-1"></i> Interest &amp; applications</span>
+                        <span class="badge text-bg-light text-dark border fw-normal">
+                            {{ $employerApplications->count() + $roleApplications->count() }}
+                        </span>
+                    </div>
+                    <div class="crm-card-bd">
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <div class="crm-field">
+                                    <div class="lbl">Current company interest</div>
+                                    <div class="val">{{ $currentCompany ?? '—' }}</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="crm-field">
+                                    <div class="lbl">Current role interest</div>
+                                    <div class="val">
+                                        {{ $currentJob?->title ?? $currentRole?->title ?? $profile?->preferred_job_role ?? '—' }}
+                                    </div>
+                                </div>
+                            </div>
+                            @if($lead->referral_source || $lead->lead_summary)
+                                <div class="col-12">
+                                    <div class="crm-field mb-0">
+                                        <div class="lbl">Lead source</div>
+                                        <div class="val text-capitalize">
+                                            {{ str_replace('_', ' ', $lead->referral_source ?? $lead->lead_summary ?? '—') }}
+                                        </div>
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+
+                        @if($employerApplications->isNotEmpty())
+                            <div class="lbl text-uppercase small fw-bold text-muted mb-2">Jobs applied (by company)</div>
+                            <div class="table-responsive mb-3">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th class="ps-0">Job</th>
+                                            <th>Company</th>
+                                            <th>Status</th>
+                                            <th>Applied</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                    @foreach($employerApplications as $application)
+                                        @php
+                                            $job = $application->job;
+                                            $company = $job?->employer?->referrerProfile?->company_name
+                                                ?: $job?->company_name
+                                                ?: $job?->employer?->name
+                                                ?: '—';
+                                        @endphp
+                                        <tr>
+                                            <td class="ps-0 fw-semibold small">{{ $job?->title ?? '—' }}</td>
+                                            <td class="small text-secondary">{{ $company }}</td>
+                                            <td>
+                                                <span class="badge rounded-pill text-bg-light text-dark border text-capitalize">
+                                                    {{ $application->status ?? 'applied' }}
+                                                </span>
+                                            </td>
+                                            <td class="text-muted small">{{ $application->created_at?->format('M j, Y') }}</td>
+                                            <td class="text-end">
+                                                @if($canViewApplications)
+                                                    <a href="{{ route('admin.applications.show', $application->id) }}" class="btn btn-sm btn-link">View</a>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endif
+
+                        @if($roleApplications->isNotEmpty())
+                            <div class="lbl text-uppercase small fw-bold text-muted mb-2">Role interests (catalog)</div>
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th class="ps-0">Role</th>
+                                            <th>Status</th>
+                                            <th>Applied</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                    @foreach($roleApplications as $application)
+                                        <tr>
+                                            <td class="ps-0 fw-semibold small">{{ $application->jobRole?->title ?? '—' }}</td>
+                                            <td>
+                                                <span class="badge rounded-pill text-bg-light text-dark border text-capitalize">
+                                                    {{ $application->status ?? 'applied' }}
+                                                </span>
+                                            </td>
+                                            <td class="text-muted small">{{ $application->created_at?->format('M j, Y') }}</td>
+                                        </tr>
+                                    @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endif
+
+                        @if($employerApplications->isEmpty() && $roleApplications->isEmpty())
+                            <p class="text-muted small mb-0">No job or role applications recorded for this candidate yet.</p>
+                        @endif
+                    </div>
+                </div>
+
                 <div class="crm-card">
                     <div class="crm-card-hd">
                         <span><i class="bi bi-clock-history me-1"></i> Activity</span>

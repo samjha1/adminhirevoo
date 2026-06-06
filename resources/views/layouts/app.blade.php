@@ -398,6 +398,18 @@
             .app-body { flex-direction: column; }
             .app-main { overflow-y: auto; }
         }
+        [data-theme="dark"] body { background: #0b1220; color: #e2e8f0; }
+        [data-theme="dark"] .app-main { background: #0b1220; }
+        [data-theme="dark"] .card { background: #111827; border-color: rgba(255,255,255,.08); color: #e2e8f0; }
+        [data-theme="dark"] .card-header { background: #111827 !important; color: #e2e8f0; border-color: rgba(255,255,255,.08); }
+        [data-theme="dark"] .table { --bs-table-bg: transparent; --bs-table-color: #e2e8f0; }
+        [data-theme="dark"] .table thead th { background: #0f172a; color: #94a3b8; }
+        [data-theme="dark"] .crm-stat-value { color: #f8fafc; }
+        [data-theme="dark"] .page-title { color: #f8fafc; }
+        [data-theme="dark"] .form-control, [data-theme="dark"] .form-select {
+            background: #0f172a; border-color: rgba(255,255,255,.12); color: #e2e8f0;
+        }
+        .global-search { max-width: 280px; }
     </style>
     @stack('styles')
 </head>
@@ -423,6 +435,17 @@
 
                 <div class="d-flex align-items-center gap-2">
                     @auth('admin')
+                        @if(auth('admin')->user()->canPermission('leads.view'))
+                        <form class="d-none d-md-flex global-search m-0" method="GET" action="{{ route('admin.leads.index') }}">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-transparent border-secondary text-white-50"><i class="bi bi-search"></i></span>
+                                <input type="search" name="q" class="form-control border-secondary bg-transparent text-white" placeholder="Search portal…">
+                            </div>
+                        </form>
+                        @endif
+                        <button type="button" class="btn btn-sm btn-outline-light" id="themeToggle" title="Toggle dark/light mode">
+                            <i class="bi bi-moon-stars"></i>
+                        </button>
                         <span class="d-none d-sm-inline small text-white-50">
                             Signed in as <span class="text-white">{{ auth('admin')->user()->email }}</span>
                         </span>
@@ -482,13 +505,29 @@
 <script>
     (function () {
         const panel = document.getElementById('sidebarOffcanvas');
-        if (!panel) return;
-        panel.querySelectorAll('.sidebar-link').forEach(function (link) {
-            link.addEventListener('click', function () {
-                const instance = bootstrap.Offcanvas.getInstance(panel);
-                if (instance) instance.hide();
+        if (panel) {
+            panel.querySelectorAll('.sidebar-link').forEach(function (link) {
+                link.addEventListener('click', function () {
+                    const instance = bootstrap.Offcanvas.getInstance(panel);
+                    if (instance) instance.hide();
+                });
             });
-        });
+        }
+        const root = document.documentElement;
+        const stored = localStorage.getItem('admin-theme');
+        if (stored) root.setAttribute('data-theme', stored);
+        const toggle = document.getElementById('themeToggle');
+        if (toggle) {
+            toggle.addEventListener('click', function () {
+                const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+                root.setAttribute('data-theme', next);
+                localStorage.setItem('admin-theme', next);
+                toggle.querySelector('i').className = next === 'dark' ? 'bi bi-sun' : 'bi bi-moon-stars';
+            });
+            if (root.getAttribute('data-theme') === 'dark') {
+                toggle.querySelector('i').className = 'bi bi-sun';
+            }
+        }
     })();
 </script>
 @stack('scripts')

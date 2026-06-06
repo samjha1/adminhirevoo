@@ -9,6 +9,7 @@ enum AdminRole: string
     case Marketing = 'marketing';
     case SalesManager = 'sales_manager';
     case SalesEmployee = 'sales_employee';
+    case Recruiter = 'recruiter';
 
     public function label(): string
     {
@@ -18,6 +19,7 @@ enum AdminRole: string
             self::Marketing => 'Marketing',
             self::SalesManager => 'Sales Manager',
             self::SalesEmployee => 'Sales Employee',
+            self::Recruiter => 'Recruiter',
         };
     }
 

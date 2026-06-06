@@ -17,6 +17,7 @@ class AdminRbacSeeder extends Seeder
 
         $this->upsertAdmin('superadmin@themesdesign.test', 'Super Admin', AdminRole::SuperAdmin, 'super_admin', null, null, $password);
         $this->upsertAdmin('admin@themesdesign.test', 'Platform Admin', AdminRole::Admin, 'admin', null, null, $password);
+        $this->upsertAdmin('recruiter@themesdesign.test', 'Portal Recruiter', AdminRole::Recruiter, 'recruiter', null, null, $password);
         $this->upsertAdmin('marketing@themesdesign.test', 'Marketing User', AdminRole::Marketing, 'marketing', null, null, $password);
 
         $talentManager = $this->upsertAdmin(

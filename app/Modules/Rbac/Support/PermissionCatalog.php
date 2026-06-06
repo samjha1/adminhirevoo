@@ -42,6 +42,31 @@ final class PermissionCatalog
             ['slug' => 'employer_payments.view', 'group' => 'platform', 'name' => 'View employer plan payments'],
             ['slug' => 'employer_payments.complete', 'group' => 'platform', 'name' => 'Verify employer plan cheques'],
             ['slug' => 'platform.sponsored_ads', 'group' => 'platform', 'name' => 'Moderate sponsored ads'],
+            // Job Portal module
+            ['slug' => 'portal.dashboard.view', 'group' => 'portal', 'name' => 'View job portal dashboard'],
+            ['slug' => 'portal.companies.view', 'group' => 'portal', 'name' => 'View companies'],
+            ['slug' => 'portal.companies.create', 'group' => 'portal', 'name' => 'Create company'],
+            ['slug' => 'portal.companies.edit', 'group' => 'portal', 'name' => 'Edit company'],
+            ['slug' => 'portal.companies.delete', 'group' => 'portal', 'name' => 'Delete company'],
+            ['slug' => 'portal.jobs.view', 'group' => 'portal', 'name' => 'View jobs'],
+            ['slug' => 'portal.jobs.create', 'group' => 'portal', 'name' => 'Create jobs'],
+            ['slug' => 'portal.jobs.edit', 'group' => 'portal', 'name' => 'Edit jobs'],
+            ['slug' => 'portal.jobs.delete', 'group' => 'portal', 'name' => 'Delete jobs'],
+            ['slug' => 'portal.candidates.view', 'group' => 'portal', 'name' => 'View candidates'],
+            ['slug' => 'portal.candidates.profile', 'group' => 'portal', 'name' => 'View candidate profile'],
+            ['slug' => 'portal.applications.view', 'group' => 'portal', 'name' => 'View applications'],
+            ['slug' => 'portal.applications.update_status', 'group' => 'portal', 'name' => 'Update application status'],
+            ['slug' => 'portal.reports.view', 'group' => 'portal', 'name' => 'View reports'],
+            ['slug' => 'portal.reports.export', 'group' => 'portal', 'name' => 'Export reports'],
+            ['slug' => 'portal.users.view', 'group' => 'portal', 'name' => 'View portal users'],
+            ['slug' => 'portal.users.create', 'group' => 'portal', 'name' => 'Create portal users'],
+            ['slug' => 'portal.users.edit', 'group' => 'portal', 'name' => 'Edit portal users'],
+            ['slug' => 'portal.users.delete', 'group' => 'portal', 'name' => 'Delete portal users'],
+            ['slug' => 'portal.roles.view', 'group' => 'portal', 'name' => 'View roles'],
+            ['slug' => 'portal.roles.create', 'group' => 'portal', 'name' => 'Create roles'],
+            ['slug' => 'portal.roles.edit', 'group' => 'portal', 'name' => 'Edit roles'],
+            ['slug' => 'portal.roles.delete', 'group' => 'portal', 'name' => 'Delete roles'],
+            ['slug' => 'portal.settings.manage', 'group' => 'portal', 'name' => 'Manage portal settings'],
         ];
     }
 
@@ -50,9 +75,32 @@ final class PermissionCatalog
     {
         $all = array_column(self::all(), 'slug');
 
+        $portalAdmin = [
+            'portal.dashboard.view',
+            'portal.companies.view', 'portal.companies.edit',
+            'portal.jobs.view', 'portal.jobs.edit',
+            'portal.candidates.view', 'portal.candidates.profile',
+            'portal.applications.view', 'portal.applications.update_status',
+            'portal.reports.view', 'portal.reports.export',
+            'portal.users.view', 'portal.users.edit',
+            'platform.users', 'platform.employers', 'platform.jobs', 'applications.view',
+            'analytics.view', 'analytics.export',
+        ];
+
+        $recruiter = [
+            'portal.companies.view',
+            'portal.jobs.view', 'portal.jobs.edit',
+            'portal.candidates.view', 'portal.candidates.profile',
+            'portal.applications.view', 'portal.applications.update_status',
+        ];
+
         return [
             'super_admin' => $all,
-            'admin' => array_values(array_filter($all, fn (string $s) => ! in_array($s, ['rbac.manage_permissions', 'audit.view'], true))),
+            'admin' => array_values(array_unique(array_merge(
+                array_filter($all, fn (string $s) => ! in_array($s, ['rbac.manage_permissions', 'audit.view'], true)),
+                $portalAdmin,
+            ))),
+            'recruiter' => $recruiter,
             'marketing' => [
                 'leads.view', 'leads.view_all', 'leads.create', 'leads.import', 'leads.export',
                 'leads.assign_manager', 'leads.reassign', 'leads.release', 'consultations.view',
@@ -81,6 +129,7 @@ final class PermissionCatalog
             'marketing' => 'marketing',
             'sales_manager' => 'sales_manager',
             'sales_employee' => 'sales_employee',
+            'recruiter' => 'recruiter',
         ];
     }
 }

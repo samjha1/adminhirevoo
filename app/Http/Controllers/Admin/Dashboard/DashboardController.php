@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin\Dashboard;
 use App\Enums\AdminRole;
 use App\Http\Controllers\Controller;
 use App\Services\ExecutiveDashboardService;
+use App\Services\Portal\PortalDashboardService;
 use App\Services\RoleDashboardService;
 use App\Services\ScopedDashboardService;
 use App\Support\DashboardPeriod;
@@ -17,6 +18,7 @@ class DashboardController extends Controller
         private readonly ExecutiveDashboardService $executive,
         private readonly RoleDashboardService $roleDashboard,
         private readonly ScopedDashboardService $scoped,
+        private readonly PortalDashboardService $portal,
     ) {
     }
 
@@ -27,7 +29,12 @@ class DashboardController extends Controller
 
         if ($admin->role->isPlatformAdmin() || $admin->role === AdminRole::SuperAdmin) {
             if ($admin->canPermission('analytics.view_executive') || $admin->role->isPlatformAdmin()) {
-                return view('admin.dashboard.executive', $this->executive->metricsFor($admin, $period));
+                $data = $this->executive->metricsFor($admin, $period);
+                if ($admin->canPermission('portal.dashboard.view')) {
+                    $data['portalStats'] = $this->portal->overallStats();
+                }
+
+                return view('admin.dashboard.executive', $data);
             }
         }
 

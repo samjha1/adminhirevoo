@@ -86,6 +86,7 @@
     .rbac-group-icon.analytics { background: #ecfdf5; color: #059669; }
     .rbac-group-icon.rbac { background: #fef2f2; color: #dc2626; }
     .rbac-group-icon.platform { background: #fff7ed; color: #ea580c; }
+    .rbac-group-icon.portal { background: #eef2ff; color: #4f46e5; }
     .rbac-group-icon.settings { background: #f1f5f9; color: #475569; }
     .rbac-group-label { font-weight: 700; font-size: .9rem; color: #0f172a; }
     .rbac-group-desc { font-size: .75rem; color: #64748b; margin-top: .1rem; }
@@ -130,6 +131,15 @@
         background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px;
         padding: .75rem 1rem; font-size: .85rem; color: #92400e; margin-bottom: 1rem;
     }
+    .rbac-empty-setup {
+        background: #fff; border: 1px dashed #cbd5e1; border-radius: 16px;
+        padding: 2.5rem 2rem; text-align: center; color: #64748b;
+    }
+    .rbac-empty-setup i { font-size: 2.5rem; color: #94a3b8; display: block; margin-bottom: .75rem; }
+    .rbac-empty-setup code {
+        display: inline-block; margin-top: .75rem; padding: .5rem .75rem;
+        background: #f8fafc; border-radius: 8px; font-size: .8rem;
+    }
 </style>
 @endpush
 
@@ -147,6 +157,21 @@
             <p>Control what each CRM role can do — similar to permission sets in HubSpot or profiles in Salesforce.</p>
         </div>
 
+        @if(($rbacSetupRequired ?? null) === 'migrate')
+            <div class="rbac-empty-setup">
+                <i class="bi bi-database-exclamation"></i>
+                <h2 class="h5 text-dark">RBAC tables are missing</h2>
+                <p class="mb-0">Run admin panel migrations on the live server, then reload this page.</p>
+                <code>php artisan migrate --force</code>
+            </div>
+        @elseif($roles->isEmpty())
+            <div class="rbac-empty-setup">
+                <i class="bi bi-shield-exclamation"></i>
+                <h2 class="h5 text-dark">No CRM roles found</h2>
+                <p class="mb-0">Seed roles and permissions, then refresh.</p>
+                <code>php artisan db:seed --class=CrmRbacSeeder</code>
+            </div>
+        @else
         <div class="rbac-hint-bar">
             <i class="bi bi-lightbulb me-1"></i>
             Changes apply to all staff with that role. Use <strong>Talent</strong> vs <strong>Company</strong> team on
@@ -275,6 +300,7 @@
                 @endif
             </div>
         </div>
+        @endif
     </div>
 @endsection
 

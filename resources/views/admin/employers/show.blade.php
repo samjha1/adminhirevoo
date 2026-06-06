@@ -134,6 +134,9 @@
 
                         <dt class="col-8">Total applications</dt>
                         <dd class="col-4 text-end fw-semibold">{{ $jobStats['applications'] }}</dd>
+
+                        <dt class="col-8">Applications today</dt>
+                        <dd class="col-4 text-end">{{ $jobStats['applications_today'] ?? 0 }}</dd>
                     </dl>
                 </div>
             </div>
@@ -191,6 +194,58 @@
             <div class="card-body pt-3">
                 {{ $jobs->links() }}
             </div>
+        @endif
+    </div>
+
+    <div class="card shadow-soft mt-3 mt-lg-4">
+        <div class="card-body pb-0">
+            <h5 class="card-title mb-1">Applications</h5>
+            <p class="text-muted mb-3">Candidates who applied to this company's jobs.</p>
+            @include('partials.portal-date-filter', [
+                'dateFilter' => $appDateFilter ?? null,
+                'action' => route('admin.employers.show', $employer->id),
+                'periodParam' => 'app_period',
+            ])
+        </div>
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>Candidate</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Job</th>
+                    <th>Applied</th>
+                    <th>Resume</th>
+                </tr>
+                </thead>
+                <tbody>
+                @forelse($applications ?? [] as $application)
+                    @php $resume = $application->candidate?->resumes?->first(); @endphp
+                    <tr>
+                        <td class="fw-semibold">{{ $application->candidate?->name ?? '—' }}</td>
+                        <td>{{ $application->candidate?->email ?? '—' }}</td>
+                        <td>{{ $application->candidate?->phone ?? '—' }}</td>
+                        <td>{{ $application->job?->title ?? '—' }}</td>
+                        <td class="text-muted">{{ $application->created_at?->format('M j, Y') }}</td>
+                        <td>
+                            @if($resume?->file_path)
+                                <a href="{{ $resume->file_path }}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                                    <i class="bi bi-file-earmark-pdf"></i>
+                                </a>
+                            @else
+                                —
+                            @endif
+                        </td>
+                    </tr>
+                @empty
+                    <tr><td colspan="6" class="text-center text-muted py-4">No applications found.</td></tr>
+                @endforelse
+                </tbody>
+            </table>
+        </div>
+        @if(isset($applications) && $applications->hasPages())
+            <div class="card-body pt-3">{{ $applications->links() }}</div>
         @endif
     </div>
 @endsection

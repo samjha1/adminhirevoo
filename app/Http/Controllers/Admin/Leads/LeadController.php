@@ -10,6 +10,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Admin;
 use App\Models\AdminLeadStage;
 use App\Models\Hirevo\HirevoCareerConsultationRequest;
+use App\Models\Hirevo\HirevoEmployerJobApplication;
+use App\Models\Hirevo\HirevoJobApplication;
 use App\Models\Hirevo\HirevoLead;
 use App\Modules\Leads\Models\CrmFollowUp;
 use App\Modules\Leads\Services\LeadTimelineService;
@@ -18,6 +20,7 @@ use App\Services\LeadAssignmentService;
 use App\Services\LeadPipelineService;
 use App\Services\LeadTabBadgeService;
 use App\Services\LeadVisibilityService;
+use App\Support\PortalDateFilter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -50,13 +53,19 @@ class LeadController extends Controller
     private function renderIndexPage(Request $request, string $activeTab): View
     {
         $admin = auth('admin')->user();
+        $dateFilter = PortalDateFilter::fromRequest($request);
 
         $visibleLeadsQuery = HirevoLead::query();
         $this->visibility->restrictVisibleLeads($visibleLeadsQuery, $admin);
 
+        $stageCountsQuery = clone $visibleLeadsQuery;
+        $dateFilter->apply($stageCountsQuery);
+
         $leadQuery = (clone $visibleLeadsQuery)
             ->with(['candidate', 'adminStage', 'assignedTo', 'salesManager'])
             ->orderByDesc('created_at');
+
+        $dateFilter->apply($leadQuery);
 
         if ($request->filled('status')) {
             $leadQuery->where('status', $request->string('status')->toString());
@@ -140,7 +149,8 @@ class LeadController extends Controller
         return view('admin.leads.index', [
             'leads' => $leads,
             'consultations' => $consultations,
-            'crmStageCounts' => $this->leadPipeline->managementStageCountsFor($visibleLeadsQuery),
+            'crmStageCounts' => $this->leadPipeline->managementStageCountsFor($stageCountsQuery),
+            'dateFilter' => $dateFilter,
             'managementStages' => $this->leadPipeline->managementStages(),
             'crmStageLabels' => $this->leadPipeline->managementStageLabels(),
             'assignableManagers' => $assignableManagers,
@@ -276,6 +286,8 @@ class LeadController extends Controller
             'assignmentHistory.fromAdmin',
             'assignmentHistory.toAdmin',
             'assignmentHistory.byAdmin',
+            'employerJob.employer.referrerProfile',
+            'jobRole',
         ]);
 
         $relatedConsultations = collect();
@@ -294,6 +306,24 @@ class LeadController extends Controller
         $assignableManagers = $this->talentTeamManagers();
         $assignableEmployees = $this->talentTeamEmployees($admin);
 
+        $employerApplications = collect();
+        $roleApplications = collect();
+        if ($lead->candidate_id) {
+            $employerApplications = HirevoEmployerJobApplication::query()
+                ->with(['job.employer.referrerProfile'])
+                ->where('user_id', $lead->candidate_id)
+                ->orderByDesc('created_at')
+                ->limit(25)
+                ->get();
+
+            $roleApplications = HirevoJobApplication::query()
+                ->with('jobRole')
+                ->where('user_id', $lead->candidate_id)
+                ->orderByDesc('created_at')
+                ->limit(25)
+                ->get();
+        }
+
         return view('admin.leads.show-lead', [
             'lead' => $lead,
             'relatedConsultations' => $relatedConsultations,
@@ -306,6 +336,9 @@ class LeadController extends Controller
             'assignableEmployees' => $assignableEmployees,
             'timeline' => $timelineService->forLead($lead),
             'upcomingFollowUps' => CrmFollowUp::query()->where('lead_id', $lead->id)->with('admin')->orderBy('scheduled_at')->limit(8)->get(),
+            'employerApplications' => $employerApplications,
+            'roleApplications' => $roleApplications,
+            'canViewApplications' => $admin->canPermission('applications.view') || $admin->canPermission('portal.applications.view'),
         ]);
     }
 

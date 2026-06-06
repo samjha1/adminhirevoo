@@ -196,8 +196,9 @@
         $canBulkManagers = $canBulkManagers ?? $me->canPermission('leads.assign_manager');
         $canBulkEmployees = $canBulkEmployees ?? ($me->canPermission('leads.assign_employee') && $me->role === \App\Enums\AdminRole::SalesManager);
         $bulkManagerActorLabel = $bulkManagerActorLabel ?? 'Admin';
+        $dateFilter = $dateFilter ?? \App\Support\PortalDateFilter::fromRequest(request());
         $hasFilters = request()->filled('q') || request()->filled('status') || request()->filled('assignment_status')
-            || request()->filled('mgmt_stage') || request()->filled('assignee_id');
+            || request()->filled('mgmt_stage') || request()->filled('assignee_id') || $dateFilter->isActive();
         $filterBase = request()->except(['leads_page', 'mgmt_stage']);
         $totalLeads = $leads->total();
         $stageTotal = array_sum($crmStageCounts ?? []);
@@ -302,6 +303,11 @@
                             Owner: {{ $assigneeChip }} <i class="bi bi-x-lg"></i>
                         </a>
                     @endif
+                    @if($dateFilter->isActive())
+                        <a class="leads-filter-chip" href="{{ route('admin.leads.index', request()->except(['period', 'date_from', 'date_to', 'leads_page'])) }}">
+                            Date: {{ $dateFilter->label() }} <i class="bi bi-x-lg"></i>
+                        </a>
+                    @endif
                     <a href="{{ route('admin.leads.index') }}" class="leads-filter-chip text-secondary border-secondary-subtle bg-white">
                         Clear all
                     </a>
@@ -378,6 +384,7 @@
                                 @endforeach
                             </select>
                         </div>
+                        @include('partials.crm-date-filter-fields', ['dateFilter' => $dateFilter])
                         <div class="col-12 col-lg-auto ms-lg-auto">
                             <button type="submit" class="btn btn-primary w-100 w-lg-auto px-4">
                                 <i class="bi bi-check2 me-1"></i>Apply

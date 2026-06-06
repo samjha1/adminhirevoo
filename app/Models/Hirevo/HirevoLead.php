@@ -58,4 +58,14 @@ class HirevoLead extends Model
     {
         return $this->hasMany(LeadAssignmentHistory::class, 'lead_id')->orderByDesc('created_at');
     }
+
+    public function employerJob(): BelongsTo
+    {
+        return $this->belongsTo(HirevoEmployerJob::class, 'employer_job_id');
+    }
+
+    public function jobRole(): BelongsTo
+    {
+        return $this->belongsTo(HirevoJobRole::class, 'job_role_id');
+    }
 }
