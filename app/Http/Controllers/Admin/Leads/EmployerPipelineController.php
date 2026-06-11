@@ -109,8 +109,7 @@ class EmployerPipelineController extends Controller
             'planPayments' => $prospect->user_id
                 ? HirevoPayment::query()
                     ->where('user_id', $prospect->user_id)
-                    ->where('type', HirevoPayment::TYPE_EMPLOYER_SUBSCRIPTION)
-                    ->where('payment_gateway', HirevoPayment::GATEWAY_CHEQUE)
+                    ->employerPlanCheckout()
                     ->orderByDesc('created_at')
                     ->limit(5)
                     ->get()

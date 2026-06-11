@@ -76,8 +76,7 @@ class EmployerPlanPaymentVisibilityService
         }
 
         $query = HirevoPayment::query()
-            ->where('type', HirevoPayment::TYPE_EMPLOYER_SUBSCRIPTION)
-            ->where('payment_gateway', HirevoPayment::GATEWAY_CHEQUE)
+            ->employerPlanCheckout()
             ->where('status', HirevoPayment::STATUS_PENDING);
 
         $this->restrictVisible($query, $admin);

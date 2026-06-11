@@ -8,6 +8,7 @@ use App\Enums\LeadSalesStatus;
 use App\Models\Admin;
 use App\Models\AdminLeadStage;
 use App\Models\LeadAssignmentHistory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -18,6 +19,13 @@ class HirevoLead extends Model
     protected $table = 'leads';
 
     protected $guarded = [];
+
+    protected static function booted(): void
+    {
+        static::addGlobalScope('linkedCandidate', function (Builder $query): void {
+            $query->whereNotNull('candidate_id');
+        });
+    }
 
     protected function casts(): array
     {

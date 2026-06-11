@@ -172,16 +172,23 @@ class TalentLeadPipelineTest extends TestCase
     {
         $marketing = Admin::query()->where('email', 'marketing@themesdesign.test')->firstOrFail();
 
+        $candidate = HirevoUser::query()->create([
+            'name' => 'Referral Source Search',
+            'email' => 'referral.search.'.uniqid().'@hirevoo.test',
+            'role' => 'candidate',
+        ]);
+
         HirevoLead::query()->create([
-            'candidate_id' => null,
+            'candidate_id' => $candidate->id,
             'status' => 'available',
             'referral_source' => 'unique_source_xyz_123',
-            'lead_summary' => 'guest_test',
+            'lead_summary' => 'home_goal_demo',
         ]);
 
         $this->actingAs($marketing, 'admin')
             ->get(route('admin.leads.index', ['q' => 'unique_source_xyz_123']))
             ->assertOk()
+            ->assertSee('Referral Source Search')
             ->assertSee('unique_source_xyz_123');
     }
 }

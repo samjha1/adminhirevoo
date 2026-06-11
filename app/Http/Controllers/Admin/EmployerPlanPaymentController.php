@@ -30,8 +30,7 @@ class EmployerPlanPaymentController extends Controller
         }
 
         $query = HirevoPayment::query()
-            ->where('type', HirevoPayment::TYPE_EMPLOYER_SUBSCRIPTION)
-            ->where('payment_gateway', HirevoPayment::GATEWAY_CHEQUE)
+            ->employerPlanCheckout()
             ->with(['user.referrerProfile'])
             ->orderByDesc('created_at');
 
@@ -43,9 +42,7 @@ class EmployerPlanPaymentController extends Controller
 
         $payments = $query->paginate(20)->withQueryString();
 
-        $countsQuery = HirevoPayment::query()
-            ->where('type', HirevoPayment::TYPE_EMPLOYER_SUBSCRIPTION)
-            ->where('payment_gateway', HirevoPayment::GATEWAY_CHEQUE);
+        $countsQuery = HirevoPayment::query()->employerPlanCheckout();
 
         $this->visibility->restrictVisible($countsQuery, $admin);
 
@@ -67,8 +64,7 @@ class EmployerPlanPaymentController extends Controller
         abort_unless($admin->canPermission('employer_payments.complete'), 403);
         abort_unless($this->visibility->canView($admin, $payment), 403);
 
-        if ($payment->type !== HirevoPayment::TYPE_EMPLOYER_SUBSCRIPTION
-            || $payment->payment_gateway !== HirevoPayment::GATEWAY_CHEQUE) {
+        if (! $payment->isEmployerPlanCheckout()) {
             abort(404);
         }
 
@@ -80,6 +76,8 @@ class EmployerPlanPaymentController extends Controller
 
         $planName = (string) ($payment->fresh()->meta['plan_name'] ?? 'plan');
 
-        return back()->with('success', "Cheque verified. {$planName} subscription activated for the employer.");
+        $method = $payment->payment_gateway === HirevoPayment::GATEWAY_NETBANKING ? 'Net banking payment' : 'Cheque';
+
+        return back()->with('success', "{$method} verified. {$planName} subscription activated for the employer.");
     }
 }

@@ -6,7 +6,7 @@
     <div class="page-header">
         <div>
             <h1 class="page-title">Employer plan payments</h1>
-            <div class="page-subtitle">Cheque checkout requests from the Hirevo employer dashboard</div>
+            <div class="page-subtitle">Cheque and net banking checkout requests from the Hirevo employer dashboard</div>
         </div>
         <div class="d-flex flex-wrap gap-2 align-items-center">
             <span class="badge text-bg-warning text-dark">{{ $pendingCount }} pending</span>
@@ -49,7 +49,7 @@
                         <th>Company</th>
                         <th>Plan</th>
                         <th>Amount</th>
-                        <th>Cheque</th>
+                        <th>Payment</th>
                         <th>Status</th>
                         <th>Submitted</th>
                         @if($canComplete)
@@ -65,10 +65,14 @@
                         $planName = $meta['plan_name'] ?? ucfirst((string) ($meta['plan_key'] ?? '—'));
                         $baseAmount = (float) ($meta['base_amount'] ?? 0);
                         $gstAmount = (float) ($meta['gst_amount'] ?? 0);
-                        $chequeDate = ! empty($meta['cheque_date'])
-                            ? \Illuminate\Support\Carbon::parse($meta['cheque_date'])->format('d M Y')
-                            : '—';
+                        $paymentDate = ! empty($meta['payment_date'])
+                            ? \Illuminate\Support\Carbon::parse($meta['payment_date'])->format('d M Y')
+                            : (! empty($meta['cheque_date'])
+                                ? \Illuminate\Support\Carbon::parse($meta['cheque_date'])->format('d M Y')
+                                : '—');
+                        $paymentLabel = $payment->payment_gateway === \App\Models\Hirevo\HirevoPayment::GATEWAY_NETBANKING ? 'UTR' : 'Cheque';
                         $isPending = $payment->status === \App\Models\Hirevo\HirevoPayment::STATUS_PENDING;
+                        $needsActivation = empty($meta['subscription_activated_at']);
                     @endphp
                     <tr>
                         <td>
@@ -83,12 +87,15 @@
                         </td>
                         <td class="fw-semibold">₹{{ number_format((float) $payment->amount, 2) }}</td>
                         <td>
-                            <div>#{{ $payment->payment_reference ?? '—' }}</div>
-                            <div class="small text-muted">{{ $chequeDate }}</div>
+                            <div class="small text-muted text-uppercase">{{ str_replace('_', ' ', $payment->payment_gateway ?? 'offline') }}</div>
+                            <div>{{ $paymentLabel }} #{{ $payment->payment_reference ?? '—' }}</div>
+                            <div class="small text-muted">{{ $paymentDate }}</div>
                         </td>
                         <td>
                             @if($isPending)
                                 <span class="badge text-bg-warning text-dark">Pending verification</span>
+                            @elseif($needsActivation)
+                                <span class="badge text-bg-danger">Paid · not activated</span>
                             @elseif($payment->status === 'completed')
                                 <span class="badge text-bg-success">Completed</span>
                             @else
@@ -98,13 +105,15 @@
                         <td class="text-muted small">{{ $payment->created_at?->format('d M Y, H:i') }}</td>
                         @if($canComplete)
                             <td class="text-end">
-                                @if($isPending)
+                                @if($isPending || $needsActivation)
                                     <form method="POST"
                                           action="{{ route('admin.employer-plan-payments.complete', $payment) }}"
                                           class="d-inline"
-                                          onsubmit="return confirm('Verify this cheque and activate the employer subscription?');">
+                                          onsubmit="return confirm('Verify this payment and activate the employer subscription?');">
                                         @csrf
-                                        <button type="submit" class="btn btn-sm btn-primary">Verify &amp; activate</button>
+                                        <button type="submit" class="btn btn-sm btn-primary">
+                                            {{ $isPending ? 'Verify & activate' : 'Activate subscription' }}
+                                        </button>
                                     </form>
                                 @else
                                     <span class="text-muted small">—</span>

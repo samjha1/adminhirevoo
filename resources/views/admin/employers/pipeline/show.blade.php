@@ -38,7 +38,8 @@
                                 <div>
                                     <div class="fw-semibold">{{ $planLabel }} · ₹{{ number_format((float) $planPayment->amount, 2) }}</div>
                                     <div class="small text-muted">
-                                        Cheque #{{ $planPayment->payment_reference ?? '—' }}
+                                        {{ $planPayment->payment_gateway === \App\Models\Hirevo\HirevoPayment::GATEWAY_NETBANKING ? 'UTR' : 'Cheque' }}
+                                        #{{ $planPayment->payment_reference ?? '—' }}
                                         · {{ $planPayment->created_at?->format('d M Y') }}
                                     </div>
                                 </div>
@@ -52,7 +53,7 @@
                                 <form method="POST"
                                       action="{{ route('admin.employer-plan-payments.complete', $planPayment) }}"
                                       class="mt-2"
-                                      onsubmit="return confirm('Verify this cheque and activate the subscription?');">
+                                      onsubmit="return confirm('Verify this payment and activate the subscription?');">
                                     @csrf
                                     <button type="submit" class="btn btn-sm btn-outline-primary">Verify &amp; activate</button>
                                 </form>
