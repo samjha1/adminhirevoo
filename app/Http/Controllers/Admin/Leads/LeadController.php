@@ -16,6 +16,7 @@ use App\Models\Hirevo\HirevoLead;
 use App\Modules\Leads\Models\CrmFollowUp;
 use App\Modules\Leads\Services\LeadTimelineService;
 use App\Services\CandidateInsightService;
+use App\Services\CandidateSectorService;
 use App\Services\LeadAssignmentService;
 use App\Services\LeadPipelineService;
 use App\Services\LeadTabBadgeService;
@@ -32,6 +33,7 @@ class LeadController extends Controller
 
     public function __construct(
         private readonly CandidateInsightService $candidateInsightService,
+        private readonly CandidateSectorService $candidateSectors,
         private readonly LeadPipelineService $leadPipeline,
         private readonly LeadVisibilityService $visibility,
         private readonly LeadAssignmentService $assignmentService,
@@ -61,11 +63,27 @@ class LeadController extends Controller
         $stageCountsQuery = clone $visibleLeadsQuery;
         $dateFilter->apply($stageCountsQuery);
 
+        $leadRelations = [
+            'candidate',
+            'adminStage',
+            'assignedTo',
+            'salesManager',
+        ];
+        if ($this->candidateSectors->sectorFeaturesAvailable()) {
+            $leadRelations[] = 'jobRole';
+            $leadRelations[] = 'candidate.candidateProfile';
+            $leadRelations['candidate.resumes'] = fn ($q) => $q->orderByDesc('is_primary')->orderByDesc('created_at')->limit(1);
+        }
+
         $leadQuery = (clone $visibleLeadsQuery)
-            ->with(['candidate', 'adminStage', 'assignedTo', 'salesManager'])
+            ->with($leadRelations)
             ->orderByDesc('created_at');
 
         $dateFilter->apply($leadQuery);
+
+        if ($request->filled('sector')) {
+            $this->candidateSectors->applyLeadFilter($leadQuery, $request->string('sector')->toString());
+        }
 
         if ($request->filled('status')) {
             $leadQuery->where('status', $request->string('status')->toString());
@@ -111,6 +129,13 @@ class LeadController extends Controller
 
         $leads = $leadQuery->paginate(12, ['*'], 'leads_page')->withQueryString();
 
+        $resolvedLeadSectors = [];
+        if ($this->candidateSectors->sectorFeaturesAvailable()) {
+            foreach ($leads as $lead) {
+                $resolvedLeadSectors[$lead->id] = $this->candidateSectors->resolveForLead($lead);
+            }
+        }
+
         $consultations = null;
         if ($admin->canPermission('consultations.view')) {
             $consultationQuery = HirevoCareerConsultationRequest::query()
@@ -146,6 +171,12 @@ class LeadController extends Controller
             AdminRole::SalesManager,
         ]);
 
+        $sectorCountsQuery = clone $visibleLeadsQuery;
+        $dateFilter->apply($sectorCountsQuery);
+        $sectorCounts = $this->candidateSectors->sectorFeaturesAvailable()
+            ? $this->candidateSectors->leadCategoryCounts($sectorCountsQuery)
+            : [];
+
         return view('admin.leads.index', [
             'leads' => $leads,
             'consultations' => $consultations,
@@ -165,6 +196,9 @@ class LeadController extends Controller
             'canBulkEmployees' => $admin->canPermission('leads.assign_employee')
                 && $admin->role === AdminRole::SalesManager,
             'bulkManagerActorLabel' => $this->bulkManagerActorLabel($admin),
+            'sectorCatalog' => $this->candidateSectors->catalog(),
+            'sectorCounts' => $sectorCounts,
+            'resolvedLeadSectors' => $resolvedLeadSectors,
         ]);
     }
 

@@ -225,6 +225,9 @@ Route::middleware(['admin.guard', 'auth:admin', 'permission:portal.candidates.vi
     Route::get('/candidates', [CandidateController::class, 'index'])
         ->middleware('permission:portal.candidates.view')
         ->name('admin.candidates.index');
+    Route::get('/candidates/export', [CandidateController::class, 'export'])
+        ->middleware('permission:portal.candidates.view|leads.export')
+        ->name('admin.candidates.export');
     Route::get('/candidates/{candidate}', [CandidateController::class, 'show'])
         ->middleware('permission:portal.candidates.profile')
         ->name('admin.candidates.show');

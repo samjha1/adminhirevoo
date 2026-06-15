@@ -36,5 +36,15 @@ class HirevoUser extends Model
     {
         return $this->hasMany(HirevoResume::class, 'user_id');
     }
+
+    public function leads(): HasMany
+    {
+        return $this->hasMany(HirevoLead::class, 'candidate_id');
+    }
+
+    public function jobApplications(): HasMany
+    {
+        return $this->hasMany(HirevoJobApplication::class, 'user_id');
+    }
 }
 

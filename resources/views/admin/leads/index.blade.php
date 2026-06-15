@@ -198,8 +198,8 @@
         $bulkManagerActorLabel = $bulkManagerActorLabel ?? 'Admin';
         $dateFilter = $dateFilter ?? \App\Support\PortalDateFilter::fromRequest(request());
         $hasFilters = request()->filled('q') || request()->filled('status') || request()->filled('assignment_status')
-            || request()->filled('mgmt_stage') || request()->filled('assignee_id') || $dateFilter->isActive();
-        $filterBase = request()->except(['leads_page', 'mgmt_stage']);
+            || request()->filled('mgmt_stage') || request()->filled('assignee_id') || request()->filled('sector') || $dateFilter->isActive();
+        $filterBase = request()->except(['leads_page', 'mgmt_stage', 'sector']);
         $totalLeads = $leads->total();
         $stageTotal = array_sum($crmStageCounts ?? []);
     @endphp
@@ -267,6 +267,12 @@
                     </a>
                 @endforeach
             </div>
+
+    @if(!empty($sectorCatalog) && ($sectorCounts ?? []) !== [])
+        @include('partials.candidate-sector-filter', [
+            'sectorRoute' => route('admin.leads.index'),
+        ])
+    @endif
 
             @if($hasFilters)
                 <div class="leads-active-filters">
@@ -365,6 +371,18 @@
                                     @endif
                                 </select>
                             </div>
+                        @endif
+                        @if(($sectorCounts ?? []) !== [])
+                        <div class="col-6 col-md-4 col-lg-2">
+                            <label class="form-label">Job sector</label>
+                            <select class="form-select" name="sector">
+                                <option value="">All sectors</option>
+                                @foreach($sectorCatalog ?? [] as $key => $sector)
+                                    <option value="{{ $key }}" @selected(request('sector') === $key)>{{ $sector['label'] }}</option>
+                                @endforeach
+                                <option value="uncategorized" @selected(request('sector') === 'uncategorized')>Uncategorized</option>
+                            </select>
+                        </div>
                         @endif
                         <div class="col-6 col-md-4 col-lg-2">
                             <label class="form-label">CRM stage</label>
@@ -469,6 +487,9 @@
                                 </th>
                             @endif
                             <th>Candidate</th>
+                            @if(($sectorCounts ?? []) !== [])
+                            <th>Sector</th>
+                            @endif
                             <th>Product</th>
                             <th>Assignment</th>
                             <th>CRM stage</th>
@@ -487,6 +508,7 @@
                                 $mgmtStage = $lead->adminStage?->stage ?? 'new';
                                 $leadScore = min(100, (int) ($lead->match_percentage ?? 0) + (int) ($lead->intent_score ?? 0));
                                 $assignSt = $lead->assignment_status?->value ?? 'new';
+                                $leadSectorKey = $resolvedLeadSectors[$lead->id] ?? null;
                             @endphp
                             <tr>
                                 @if($canBulkManagers || $canBulkEmployees)
@@ -513,6 +535,15 @@
                                         </div>
                                     </div>
                                 </td>
+                                @if(($sectorCounts ?? []) !== [])
+                                <td data-label="Sector">
+                                    @if($leadSectorKey)
+                                        <span class="badge text-bg-primary" style="font-size:.72rem">{{ ($sectorCatalog[$leadSectorKey] ?? [])['short'] ?? ($sectorCatalog[$leadSectorKey]['label'] ?? '—') }}</span>
+                                    @else
+                                        <span class="text-muted">—</span>
+                                    @endif
+                                </td>
+                                @endif
                                 <td data-label="Product">
                                     <span class="badge-product">{{ str_replace('_', ' ', $lead->status) }}</span>
                                 </td>

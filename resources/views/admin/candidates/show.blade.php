@@ -11,7 +11,11 @@
     <div class="page-header">
         <div>
             <h1 class="page-title">{{ $candidate->name }}</h1>
-            <div class="page-subtitle">{{ $candidate->email }} · Registered {{ $candidate->created_at?->format('M j, Y') }}</div>
+            <div class="page-subtitle">{{ $candidate->email }} · Registered {{ $candidate->created_at?->format('M j, Y') }}
+                @if(!empty($sectorLabel))
+                    · <span class="badge text-bg-primary">{{ $sectorLabel }}</span>
+                @endif
+            </div>
         </div>
         <a href="{{ route('admin.candidates.index') }}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left me-1"></i>Back
@@ -27,6 +31,8 @@
                         <dt class="col-sm-4">Name</dt><dd class="col-sm-8">{{ $candidate->name }}</dd>
                         <dt class="col-sm-4">Email</dt><dd class="col-sm-8">{{ $candidate->email }}</dd>
                         <dt class="col-sm-4">Phone</dt><dd class="col-sm-8">{{ $candidate->phone ?? '—' }}</dd>
+                        <dt class="col-sm-4">Job sector</dt><dd class="col-sm-8">{{ $sectorLabel ?? '—' }}</dd>
+                        <dt class="col-sm-4">Preferred role</dt><dd class="col-sm-8">{{ $profile?->preferred_job_role ?? '—' }}</dd>
                         <dt class="col-sm-4">Headline</dt><dd class="col-sm-8">{{ $profile?->headline ?? '—' }}</dd>
                         <dt class="col-sm-4">Location</dt><dd class="col-sm-8">{{ $profile?->location ?? '—' }}</dd>
                         <dt class="col-sm-4">Experience</dt><dd class="col-sm-8">{{ $profile?->experience_years ? $profile->experience_years.' years' : '—' }}</dd>
