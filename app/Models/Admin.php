@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use App\Enums\AdminRole;
+use App\Enums\SalesRegion;
 use App\Enums\SalesTeam;
+use App\Services\OrgHierarchyService;
 use App\Modules\Rbac\Models\CrmRole;
 use App\Modules\Rbac\Services\PermissionResolver;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -29,6 +31,7 @@ class Admin extends Authenticatable
         'role',
         'crm_role_id',
         'sales_team',
+        'sales_region',
         'manager_id',
     ];
 
@@ -43,13 +46,29 @@ class Admin extends Authenticatable
             'password' => 'hashed',
             'role' => AdminRole::class,
             'sales_team' => SalesTeam::class,
+            'sales_region' => SalesRegion::class,
         ];
+    }
+
+    public function resolvedRegion(): ?SalesRegion
+    {
+        if ($this->sales_region instanceof SalesRegion) {
+            return $this->sales_region;
+        }
+
+        return app(OrgHierarchyService::class)->inheritRegion($this->manager_id);
+    }
+
+    /** @return \Illuminate\Support\Collection<int, int> */
+    public function descendantIds(): \Illuminate\Support\Collection
+    {
+        return app(OrgHierarchyService::class)->descendantIds($this);
     }
 
     public function onCandidateTeam(): bool
     {
         return $this->sales_team === SalesTeam::Candidate
-            || ($this->sales_team === null && $this->hasAnyRole([AdminRole::SalesManager, AdminRole::SalesEmployee]));
+            || ($this->sales_team === null && $this->hasAnyRole([AdminRole::Asm, AdminRole::SalesManager, AdminRole::SalesEmployee]));
     }
 
     public function onEmployerTeam(): bool

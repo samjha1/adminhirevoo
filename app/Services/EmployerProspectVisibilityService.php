@@ -5,10 +5,13 @@ namespace App\Services;
 use App\Enums\AdminRole;
 use App\Models\Admin;
 use App\Modules\Leads\Models\CrmEmployerProspect;
+use App\Services\Concerns\ScopesSalesHierarchy;
 use Illuminate\Database\Eloquent\Builder;
 
 class EmployerProspectVisibilityService
 {
+    use ScopesSalesHierarchy;
+
     public function __construct(
         private readonly SalesTeamService $teams,
     ) {
@@ -22,7 +25,7 @@ class EmployerProspectVisibilityService
         }
 
         match ($admin->role) {
-            AdminRole::SalesManager => $this->scopeForSalesManager($query, $admin),
+            AdminRole::Asm, AdminRole::SalesManager => $this->scopeForSalesHierarchy($query, $admin, 'sales_manager_id', 'assigned_to'),
             AdminRole::SalesEmployee => $query->where('assigned_to', $admin->id),
             default => null,
         };
@@ -42,39 +45,14 @@ class EmployerProspectVisibilityService
             return (int) $prospect->assigned_to === (int) $admin->id;
         }
 
-        if ($admin->role === AdminRole::SalesManager) {
-            if ((int) $prospect->sales_manager_id === (int) $admin->id
-                || (int) $prospect->assigned_to === (int) $admin->id) {
-                return true;
-            }
-
-            if ($prospect->assigned_to) {
-                return Admin::query()
-                    ->whereKey($prospect->assigned_to)
-                    ->where('manager_id', $admin->id)
-                    ->exists();
-            }
-
-            return false;
+        if (in_array($admin->role, [AdminRole::Asm, AdminRole::SalesManager], true)) {
+            return $this->canViewViaSalesHierarchy(
+                $admin,
+                $prospect->sales_manager_id,
+                $prospect->assigned_to,
+            );
         }
 
         return false;
-    }
-
-    /** @param  Builder<CrmEmployerProspect>  $query */
-    private function scopeForSalesManager(Builder $query, Admin $manager): void
-    {
-        $reportIds = Admin::query()
-            ->where('manager_id', $manager->id)
-            ->pluck('id');
-
-        $query->where(function (Builder $q) use ($manager, $reportIds) {
-            $q->where('sales_manager_id', $manager->id)
-                ->orWhere('assigned_to', $manager->id);
-
-            if ($reportIds->isNotEmpty()) {
-                $q->orWhereIn('assigned_to', $reportIds);
-            }
-        });
     }
 }

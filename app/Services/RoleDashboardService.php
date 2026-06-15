@@ -17,6 +17,7 @@ use App\Modules\Leads\Models\CrmCallLog;
 use App\Modules\Leads\Models\CrmFollowUp;
 use App\Modules\Leads\Models\CrmStandaloneLead;
 use App\Support\DashboardPeriod;
+use App\Services\OrgHierarchyService;
 
 class RoleDashboardService
 {
@@ -34,9 +35,17 @@ class RoleDashboardService
         return match ($admin->role) {
             AdminRole::SuperAdmin, AdminRole::Admin => $this->adminMetrics(),
             AdminRole::Marketing => $this->marketingMetrics($period),
-            AdminRole::SalesManager => $this->salesManagerMetrics($admin, $period),
+            AdminRole::Asm, AdminRole::SalesManager => $this->salesManagerMetrics($admin, $period),
             AdminRole::SalesEmployee => $this->salesEmployeeMetrics($admin, $period),
+            AdminRole::Recruiter => $this->recruiterMetrics(),
         };
+    }
+
+    private function recruiterMetrics(): array
+    {
+        return [
+            'role' => AdminRole::Recruiter,
+        ];
     }
 
     private function adminMetrics(): array
@@ -121,23 +130,34 @@ class RoleDashboardService
 
     private function salesManagerMetrics(Admin $admin, DashboardPeriod $period): array
     {
-        $base = HirevoLead::query()->where(function ($q) use ($admin) {
-            $q->where('sales_manager_id', $admin->id)
-                ->orWhere('assigned_to', $admin->id);
+        $subtreeIds = $this->subtreeAdminIds($admin);
+
+        $base = HirevoLead::query()->where(function ($q) use ($admin, $subtreeIds) {
+            $q->where('assigned_to', $admin->id);
+
+            if ($subtreeIds->isNotEmpty()) {
+                $q->orWhereIn('assigned_to', $subtreeIds)
+                    ->orWhereIn('sales_manager_id', $subtreeIds);
+            }
+
+            if ($admin->role === AdminRole::SalesManager) {
+                $q->orWhere('sales_manager_id', $admin->id);
+            }
         });
 
         $leadIds = (clone $base)->pluck('id');
 
         $toMe = (clone $base)->where('assigned_to', $admin->id)->count();
         $toEmployees = HirevoLead::query()
-            ->where('sales_manager_id', $admin->id)
+            ->whereIn('assigned_to', $subtreeIds)
             ->whereNotNull('assigned_to')
             ->where('assigned_to', '!=', $admin->id)
+            ->when($admin->role === AdminRole::SalesManager, fn ($q) => $q->where('sales_manager_id', $admin->id))
             ->count();
         $inProgress = (clone $base)->where('assignment_status', LeadAssignmentStatus::InProgress)->count();
         $closed = (clone $base)->where('assignment_status', LeadAssignmentStatus::Closed)->count();
 
-        $teamAdminIds = Admin::query()->where('manager_id', $admin->id)->pluck('id')->push($admin->id);
+        $teamAdminIds = $subtreeIds->push($admin->id);
 
         $mySummary = $this->pipelineMetrics->talentSummary(
             HirevoLead::query()->where('assigned_to', $admin->id),
@@ -145,7 +165,7 @@ class RoleDashboardService
         );
 
         return [
-            'role' => AdminRole::SalesManager,
+            'role' => $admin->role,
             'period' => $period,
             'leadsAssignedToMe' => $toMe,
             'leadsWithEmployees' => $toEmployees,
@@ -208,6 +228,19 @@ class RoleDashboardService
                 ->count(),
             'conversionPercent' => $conversionPct,
         ];
+    }
+
+    /** @return \Illuminate\Support\Collection<int, int> */
+    private function subtreeAdminIds(Admin $admin): \Illuminate\Support\Collection
+    {
+        if ($admin->role === AdminRole::Asm) {
+            return app(OrgHierarchyService::class)
+                ->descendantIds($admin)
+                ->reject(fn (int $id) => $id === $admin->id)
+                ->values();
+        }
+
+        return Admin::query()->where('manager_id', $admin->id)->pluck('id');
     }
 
     /** @param  \Illuminate\Support\Collection<int, int>  $leadIds */

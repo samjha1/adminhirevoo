@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\AdminRole;
+use App\Enums\SalesRegion;
 use App\Enums\SalesTeam;
 use App\Models\Admin;
 use Illuminate\Database\Eloquent\Builder;
@@ -23,9 +24,20 @@ class SalesTeamService
             return SalesTeam::tryFrom($admin->sales_team);
         }
 
-        return $admin->hasAnyRole([AdminRole::SalesManager, AdminRole::SalesEmployee])
+        return $admin->hasAnyRole([AdminRole::Asm, AdminRole::SalesManager, AdminRole::SalesEmployee])
             ? SalesTeam::Candidate
             : null;
+    }
+
+    public function canAccessRegion(Admin $admin, SalesRegion $region): bool
+    {
+        if ($admin->role?->hasUnrestrictedLeadVisibility()) {
+            return true;
+        }
+
+        $adminRegion = $admin->resolvedRegion();
+
+        return $adminRegion === null || $adminRegion === $region;
     }
 
     public function canAccessPipeline(Admin $admin, SalesTeam $pipeline): bool

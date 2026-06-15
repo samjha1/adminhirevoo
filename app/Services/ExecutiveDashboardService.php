@@ -45,7 +45,7 @@ class ExecutiveDashboardService
                     1,
                 )
                 : 0.0,
-            'revenueGrowth' => $talentSummary['revenueGrowth'],
+            'revenueGrowth' => $companySummary['revenueGrowth'],
             'periodLabel' => $period->label(),
         ];
 
@@ -238,10 +238,7 @@ class ExecutiveDashboardService
             ->whereIn('pipeline_stage', DashboardPipelineMetrics::COMPANY_WON_STAGES)
             ->whereBetween('updated_at', [$period->start, $period->end])
             ->count();
-        $revenue = (float) (clone $q)
-            ->whereIn('pipeline_stage', DashboardPipelineMetrics::COMPANY_WON_STAGES)
-            ->whereBetween('updated_at', [$period->start, $period->end])
-            ->sum('deal_value');
+        $revenue = $this->metrics->companyRevenueBetween($period->start, $period->end, $q);
 
         return [
             'leads' => $leads,

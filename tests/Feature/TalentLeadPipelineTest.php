@@ -9,6 +9,7 @@ use App\Models\Admin;
 use App\Models\Hirevo\HirevoLead;
 use App\Models\Hirevo\HirevoUser;
 use App\Services\LeadAssignmentService;
+use App\Services\LeadVisibilityService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -166,6 +167,66 @@ class TalentLeadPipelineTest extends TestCase
             ->assertOk()
             ->assertViewHas('leads', fn ($paginator) => collect($paginator->items())
                 ->contains(fn ($row) => (int) $row->id === (int) $orphan->id));
+    }
+
+    public function test_asm_sees_leads_assigned_to_nested_employees(): void
+    {
+        $marketing = Admin::query()->where('email', 'marketing@themesdesign.test')->firstOrFail();
+        $asm = Admin::query()->where('email', 'asm.talent.north@themesdesign.test')->firstOrFail();
+        $manager = Admin::query()->where('email', 'talent.manager1@themesdesign.test')->firstOrFail();
+        $exec = Admin::query()->where('email', 'talent.executive1@themesdesign.test')->firstOrFail();
+
+        $candidate = HirevoUser::query()->create([
+            'name' => 'ASM Subtree Lead',
+            'email' => 'asm.subtree.'.uniqid().'@hirevoo.test',
+            'role' => 'candidate',
+        ]);
+
+        $lead = HirevoLead::query()->create([
+            'candidate_id' => $candidate->id,
+            'status' => 'available',
+            'match_percentage' => 75,
+            'assignment_status' => LeadAssignmentStatus::New->value,
+        ]);
+
+        app(LeadAssignmentService::class)->assignToSalesManager($lead, $manager, $marketing);
+        app(LeadAssignmentService::class)->assignToEmployee($lead->fresh(), $exec, $manager);
+
+        $lead->refresh();
+        $visibility = app(LeadVisibilityService::class);
+
+        $this->assertTrue($visibility->canViewLead($asm, $lead));
+
+        $scoped = HirevoLead::query();
+        $visibility->restrictVisibleLeads($scoped, $asm);
+        $this->assertTrue($scoped->whereKey($lead->id)->exists());
+    }
+
+    public function test_asm_does_not_see_other_region_team_leads(): void
+    {
+        $marketing = Admin::query()->where('email', 'marketing@themesdesign.test')->firstOrFail();
+        $northAsm = Admin::query()->where('email', 'asm.talent.north@themesdesign.test')->firstOrFail();
+        $southManager = Admin::query()->where('email', 'talent.manager.south@themesdesign.test')->firstOrFail();
+
+        $candidate = HirevoUser::query()->create([
+            'name' => 'South Region Only Lead',
+            'email' => 'south.only.'.uniqid().'@hirevoo.test',
+            'role' => 'candidate',
+        ]);
+
+        $lead = HirevoLead::query()->create([
+            'candidate_id' => $candidate->id,
+            'status' => 'available',
+            'match_percentage' => 70,
+            'assignment_status' => LeadAssignmentStatus::New->value,
+        ]);
+
+        app(LeadAssignmentService::class)->assignToSalesManager($lead, $southManager, $marketing);
+
+        $lead->refresh();
+        $visibility = app(LeadVisibilityService::class);
+
+        $this->assertFalse($visibility->canViewLead($northAsm, $lead));
     }
 
     public function test_lead_search_by_referral_source(): void

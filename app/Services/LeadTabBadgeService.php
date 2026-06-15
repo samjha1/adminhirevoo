@@ -45,7 +45,7 @@ class LeadTabBadgeService
         }
 
         return match ($admin->role) {
-            AdminRole::SalesManager => $this->visibleLeads($admin)->where(function ($q) use ($admin) {
+            AdminRole::Asm, AdminRole::SalesManager => $this->visibleLeads($admin)->where(function ($q) use ($admin) {
                 $q->where(function ($q2) use ($admin) {
                     $q2->where('assigned_to', $admin->id)
                         ->where('assignment_status', LeadAssignmentStatus::Assigned)
@@ -62,6 +62,7 @@ class LeadTabBadgeService
                 ->where('assigned_to', $admin->id)
                 ->where('sales_status', LeadSalesStatus::Pending)
                 ->count(),
+            default => 0,
         };
     }
 

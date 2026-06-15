@@ -1,10 +1,13 @@
 @php
     use App\Enums\AdminRole;
+    use App\Enums\SalesRegion;
     use App\Enums\SalesTeam;
     $mgrOnly = $managerCreatesEmployeesOnly ?? false;
+    $asmOnly = $asmCreatesManagersOnly ?? false;
     $isEdit = isset($staff);
-    $selectedRole = old('role', $isEdit ? $staff->role->value : AdminRole::SalesEmployee->value);
+    $selectedRole = old('role', $isEdit ? $staff->role->value : ($asmOnly ? AdminRole::SalesManager->value : AdminRole::SalesEmployee->value));
     $selectedTeam = old('sales_team', $isEdit ? ($staff->sales_team?->value ?? '') : ($lockedTeam?->value ?? SalesTeam::Candidate->value));
+    $selectedRegion = old('sales_region', $isEdit ? ($staff->sales_region?->value ?? '') : ($lockedRegion?->value ?? SalesRegion::North->value));
 @endphp
 
 <div class="mb-3">
@@ -41,6 +44,24 @@
             <input type="hidden" name="sales_team" value="{{ $lockedTeam->value }}">
         </div>
     @endif
+@elseif($asmOnly)
+    <div class="mb-3">
+        <label class="form-label">Role</label>
+        <input type="text" class="form-control" value="Sales manager" disabled>
+        <div class="form-text">ASMs can only add sales managers to their region.</div>
+    </div>
+    @if($lockedTeam)
+        <div class="mb-3">
+            <label class="form-label">Sales team</label>
+            <input type="text" class="form-control" value="{{ $lockedTeam->label() }}" disabled>
+        </div>
+    @endif
+    @if($lockedRegion)
+        <div class="mb-3">
+            <label class="form-label">Region</label>
+            <input type="text" class="form-control" value="{{ $lockedRegion->label() }}" disabled>
+        </div>
+    @endif
 @else
     <div class="mb-3">
         <label class="form-label">Role</label>
@@ -61,10 +82,22 @@
             @endforeach
         </select>
         <div class="form-text">
-            <strong>Talent</strong> → Candidates pipeline (<code>/leads</code>).
-            <strong>Companies</strong> → B2B pipeline (<code>/pipelines/companies</code>).
+            <strong>Talent</strong> → Candidates pipeline.
+            <strong>Companies</strong> → B2B pipeline.
         </div>
         @error('sales_team')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+    </div>
+
+    <div class="mb-3" id="staff-region-wrap">
+        <label class="form-label">Region <span class="text-danger" id="staff-region-required">*</span></label>
+        <select name="sales_region" id="staff-sales-region" class="form-select @error('sales_region') is-invalid @enderror">
+            <option value="">—</option>
+            @foreach($salesRegions as $region)
+                <option value="{{ $region->value }}" @selected($selectedRegion === $region->value)>{{ $region->label() }}</option>
+            @endforeach
+        </select>
+        <div class="form-text" id="staff-region-hint">Required for ASM (e.g. ASM Talent North, ASM Company South).</div>
+        @error('sales_region')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
     </div>
 
     <div class="mb-3" id="staff-manager-wrap">
@@ -75,16 +108,21 @@
                 @if($isEdit && $m->id === $staff->id)
                     @continue
                 @endif
-                @php $mgrTeam = \App\Enums\SalesTeam::normalize($m->sales_team); @endphp
+                @php
+                    $mgrTeam = SalesTeam::normalize($m->sales_team);
+                    $mgrRegion = SalesRegion::normalize($m->sales_region) ?? '';
+                @endphp
                 <option value="{{ $m->id }}"
+                        data-role="{{ $m->role->value }}"
                         data-sales-team="{{ $mgrTeam }}"
+                        data-sales-region="{{ $mgrRegion }}"
                         @selected((string) old('manager_id', $staff->manager_id ?? '') === (string) $m->id)>
                     {{ $m->name }}
-                    ({{ $mgrTeam === 'employer' ? 'Company' : 'Talent' }})
+                    ({{ $m->role->label() }}{{ $mgrTeam ? ' · '.($mgrTeam === 'employer' ? 'Company' : 'Talent') : '' }}{{ $mgrRegion ? ' · '.ucfirst($mgrRegion) : '' }})
                 </option>
             @endforeach
         </select>
-        <div class="form-text" id="staff-manager-hint">Required for <strong>Sales employee</strong>. Only managers on the same team are listed.</div>
+        <div class="form-text" id="staff-manager-hint">ASM reports to Admin. Sales managers report to ASM. Employees report to sales manager.</div>
         @error('manager_id')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
     </div>
 @endif
@@ -92,7 +130,8 @@
 @php
     $showReferralOnCreate = ! $isEdit && (
         ($mgrOnly && ($lockedTeam?->value ?? '') === 'employer')
-        || (! $mgrOnly && in_array($selectedRole, ['sales_manager', 'sales_employee'], true) && $selectedTeam === 'employer')
+        || ($asmOnly && ($lockedTeam?->value ?? '') === 'employer')
+        || (! $mgrOnly && ! $asmOnly && in_array($selectedRole, ['sales_manager', 'sales_employee', 'asm'], true) && $selectedTeam === 'employer')
     );
 @endphp
 @if($showReferralOnCreate)
@@ -112,7 +151,7 @@
     @error('referral_code')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
     <div class="form-text">Share with employers at Hirevo sign-up. Empty = auto-generated (e.g. EMP-ABC123).</div>
 </div>
-@elseif(! $isEdit)
+@elseif(! $isEdit && ! $asmOnly)
 <div class="mb-3" id="staff-referral-wrap" style="display: none;">
     <label class="form-label" for="staff-referral-code-input">Employer referral code</label>
     <div class="input-group">
@@ -157,13 +196,19 @@
 (function () {
     const roleEl = document.getElementById('staff-role');
     const teamEl = document.getElementById('staff-sales-team');
+    const regionEl = document.getElementById('staff-sales-region');
     const managerEl = document.getElementById('staff-manager-id');
     const referralWrap = document.getElementById('staff-referral-wrap');
     const referralInput = document.getElementById('staff-referral-code-input');
     const referralGenerate = document.getElementById('staff-referral-generate');
     if (!roleEl || !teamEl) return;
 
-    const salesRoles = ['sales_manager', 'sales_employee'];
+    const salesRoles = ['asm', 'sales_manager', 'sales_employee'];
+    const managerRolesByStaffRole = {
+        asm: ['super_admin', 'admin'],
+        sales_manager: ['asm'],
+        sales_employee: ['sales_manager'],
+    };
 
     function syncReferralVisibility() {
         if (!referralWrap) return;
@@ -176,22 +221,37 @@
 
     const managerRequired = document.getElementById('staff-manager-required');
     const managerElWrap = document.getElementById('staff-manager-wrap');
+    const regionWrap = document.getElementById('staff-region-wrap');
+    const regionRequired = document.getElementById('staff-region-required');
 
     function syncTeamVisibility() {
-        const isSales = salesRoles.includes(roleEl.value);
-        const isSalesEmployee = roleEl.value === 'sales_employee';
+        const role = roleEl.value;
+        const isSales = salesRoles.includes(role);
+        const isAsm = role === 'asm';
+        const needsManager = role === 'sales_manager' || role === 'sales_employee' || role === 'asm';
+
         teamEl.closest('#staff-team-wrap').style.display = isSales ? '' : 'none';
+        if (regionWrap) {
+            regionWrap.style.display = isAsm ? '' : 'none';
+        }
+        if (regionEl) {
+            regionEl.required = isAsm;
+        }
+        if (regionRequired) {
+            regionRequired.style.display = isAsm ? '' : 'none';
+        }
         if (managerElWrap) {
-            managerElWrap.style.display = isSalesEmployee ? '' : 'none';
+            managerElWrap.style.display = needsManager ? '' : 'none';
         }
         if (managerEl) {
-            managerEl.required = isSalesEmployee;
+            managerEl.required = needsManager;
         }
         if (managerRequired) {
-            managerRequired.style.display = isSalesEmployee ? '' : 'none';
+            managerRequired.style.display = needsManager ? '' : 'none';
         }
         if (!isSales) {
             teamEl.value = '';
+            if (regionEl) regionEl.value = '';
         } else if (!teamEl.value) {
             teamEl.value = 'candidate';
         }
@@ -211,12 +271,27 @@
 
     function filterManagers() {
         if (!managerEl) return;
+        const role = roleEl.value;
         const team = teamEl.value;
+        const region = regionEl ? regionEl.value : '';
+        const allowedRoles = managerRolesByStaffRole[role] || [];
+
         Array.from(managerEl.options).forEach((opt, i) => {
             if (i === 0) return;
-            const mt = opt.getAttribute('data-sales-team') || 'candidate';
-            opt.hidden = team && mt !== team;
+            const optRole = opt.getAttribute('data-role') || '';
+            const optTeam = opt.getAttribute('data-sales-team') || 'candidate';
+            const optRegion = opt.getAttribute('data-sales-region') || '';
+
+            let visible = allowedRoles.includes(optRole);
+            if (visible && team && (role === 'sales_manager' || role === 'sales_employee')) {
+                visible = optTeam === team;
+            }
+            if (visible && role === 'sales_manager' && region) {
+                visible = optRegion === region;
+            }
+            opt.hidden = !visible;
         });
+
         const selected = managerEl.selectedOptions[0];
         if (selected && selected.hidden) {
             managerEl.value = '';
@@ -228,6 +303,7 @@
         filterManagers();
         syncReferralVisibility();
     });
+    regionEl?.addEventListener('change', filterManagers);
     syncTeamVisibility();
 })();
 </script>

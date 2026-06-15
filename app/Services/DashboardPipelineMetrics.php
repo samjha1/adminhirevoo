@@ -128,15 +128,9 @@ class DashboardPipelineMetrics
             ->whereBetween('updated_at', [$period->start, $period->end])
             ->count();
 
-        $revenue = (float) (clone $q)
-            ->whereIn('pipeline_stage', self::COMPANY_WON_STAGES)
-            ->whereBetween('updated_at', [$period->start, $period->end])
-            ->sum('deal_value');
+        $revenue = $this->companyRevenueBetween($period->start, $period->end, $q);
 
-        $revenueToday = (float) (clone $q)
-            ->whereIn('pipeline_stage', self::COMPANY_WON_STAGES)
-            ->whereDate('updated_at', today())
-            ->sum('deal_value');
+        $revenueToday = $this->companyRevenueBetween(today()->startOfDay(), today()->endOfDay(), $q);
 
         $totalInPeriod = max(1, $totalLeads);
         $conversionRate = $totalInPeriod > 0
@@ -144,10 +138,7 @@ class DashboardPipelineMetrics
             : 0.0;
 
         $prev = $period->previous();
-        $prevRevenue = (float) (clone $q)
-            ->whereIn('pipeline_stage', self::COMPANY_WON_STAGES)
-            ->whereBetween('updated_at', [$prev->start, $prev->end])
-            ->sum('deal_value');
+        $prevRevenue = $this->companyRevenueBetween($prev->start, $prev->end, $q);
 
         $calls = $this->companyCallsInPeriod($prospectIds, $period);
         $activeInPeriod = (clone $q)->where(function (Builder $sub) use ($period) {
@@ -285,11 +276,7 @@ class DashboardPipelineMetrics
 
             $talent[] = $this->talentRevenueBetween($dayStart, $dayEnd);
 
-            $cq = $companyBase ? (clone $companyBase) : CrmEmployerProspect::query();
-            $company[] = (float) (clone $cq)
-                ->whereIn('pipeline_stage', self::COMPANY_WON_STAGES)
-                ->whereBetween('updated_at', [$dayStart, $dayEnd])
-                ->sum('deal_value');
+            $company[] = $this->companyRevenueBetween($dayStart, $dayEnd, $companyBase);
 
             $cursor->addDay();
             if (count($labels) > 62) {
@@ -416,12 +403,41 @@ class DashboardPipelineMetrics
             ->whereIn('pipeline_stage', self::COMPANY_WON_STAGES)
             ->whereBetween('updated_at', [$period->start, $period->end])
             ->count();
-        $revenue = (float) (clone $q)
-            ->whereIn('pipeline_stage', self::COMPANY_WON_STAGES)
-            ->whereBetween('updated_at', [$period->start, $period->end])
-            ->sum('deal_value');
+        $revenue = $this->companyRevenueBetween($period->start, $period->end, $q);
 
         return compact('leads', 'meetings', 'closed', 'revenue');
+    }
+
+    /**
+     * @param  Builder<CrmEmployerProspect>|null  $companyBase
+     */
+    public function companyRevenueBetween(\Carbon\Carbon $start, \Carbon\Carbon $end, ?Builder $companyBase = null): float
+    {
+        if (! Schema::hasTable('payments')) {
+            return 0.0;
+        }
+
+        $query = HirevoPayment::query()
+            ->where('type', HirevoPayment::TYPE_EMPLOYER_SUBSCRIPTION)
+            ->where('status', HirevoPayment::STATUS_COMPLETED)
+            ->whereBetween('created_at', [$start, $end]);
+
+        if ($companyBase !== null) {
+            $userIds = (clone $companyBase)
+                ->whereNotNull('user_id')
+                ->pluck('user_id')
+                ->unique()
+                ->filter()
+                ->values();
+
+            if ($userIds->isEmpty()) {
+                return 0.0;
+            }
+
+            $query->whereIn('user_id', $userIds);
+        }
+
+        return (float) $query->sum('amount');
     }
 
     private function talentRevenueBetween(\Carbon\Carbon $start, \Carbon\Carbon $end): float
@@ -431,7 +447,8 @@ class DashboardPipelineMetrics
         }
 
         return (float) HirevoPayment::query()
-            ->where('status', 'completed')
+            ->where('status', HirevoPayment::STATUS_COMPLETED)
+            ->where('type', '!=', HirevoPayment::TYPE_EMPLOYER_SUBSCRIPTION)
             ->whereBetween('created_at', [$start, $end])
             ->sum('amount');
     }

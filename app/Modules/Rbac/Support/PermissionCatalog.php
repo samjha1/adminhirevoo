@@ -106,6 +106,12 @@ final class PermissionCatalog
                 'leads.assign_manager', 'leads.reassign', 'leads.release', 'consultations.view',
                 'analytics.view', 'applications.view', 'employer_payments.view',
             ],
+            'asm' => [
+                'leads.view', 'leads.assign_employee', 'leads.reassign', 'leads.update_stage',
+                'leads.update_sales_status', 'leads.log_call', 'leads.manage_followups',
+                'leads.take_back', 'kanban.view', 'staff.view', 'staff.manage', 'analytics.view',
+                'applications.view', 'employer_payments.view',
+            ],
             'sales_manager' => [
                 'leads.view', 'leads.assign_employee', 'leads.reassign', 'leads.update_stage',
                 'leads.update_sales_status', 'leads.log_call', 'leads.manage_followups',
@@ -127,6 +133,7 @@ final class PermissionCatalog
             'super_admin' => 'super_admin',
             'admin' => 'admin',
             'marketing' => 'marketing',
+            'asm' => 'asm',
             'sales_manager' => 'sales_manager',
             'sales_employee' => 'sales_employee',
             'recruiter' => 'recruiter',

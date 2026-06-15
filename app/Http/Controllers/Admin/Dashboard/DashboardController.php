@@ -42,7 +42,7 @@ class DashboardController extends Controller
             return view('admin.dashboard.index', $this->roleDashboard->metricsFor($admin, $period));
         }
 
-        if (in_array($admin->role, [AdminRole::SalesManager, AdminRole::SalesEmployee], true)) {
+        if (in_array($admin->role, [AdminRole::Asm, AdminRole::SalesManager, AdminRole::SalesEmployee], true)) {
             return view('admin.dashboard.scoped', $this->scoped->metricsFor($admin, $period));
         }
 
