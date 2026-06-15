@@ -62,6 +62,7 @@
     @if(($sectorCounts ?? []) !== [])
         @include('partials.candidate-sector-filter', [
             'sectorRoute' => route('admin.candidates.index'),
+            'sectorGrandTotal' => $sectorGrandTotal ?? null,
         ])
     @endif
 

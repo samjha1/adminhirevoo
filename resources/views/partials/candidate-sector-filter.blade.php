@@ -4,7 +4,7 @@
     $activeSector = request('sector', '');
     $sectorFilterBase = request()->except(['sector', 'leads_page', 'page']);
     $sectorRoute = $sectorRoute ?? route('admin.candidates.index');
-    $sectorTotal = array_sum($sectorCounts);
+    $sectorTotal = (int) ($sectorGrandTotal ?? array_sum($sectorCounts));
 @endphp
 
 <div class="leads-stage-strip mb-3" role="navigation" aria-label="Filter by job sector">

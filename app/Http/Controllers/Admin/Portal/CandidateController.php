@@ -34,6 +34,7 @@ class CandidateController extends Controller
         $dateFilter->apply($baseQuery);
 
         $sectorCounts = $this->sectors->candidateCategoryCounts(clone $baseQuery);
+        $sectorGrandTotal = (clone $baseQuery)->count();
 
         $query = (clone $baseQuery)
             ->with([
@@ -75,6 +76,7 @@ class CandidateController extends Controller
             'direction' => $direction,
             'sectorCatalog' => $this->sectors->catalog(),
             'sectorCounts' => $sectorCounts,
+            'sectorGrandTotal' => $sectorGrandTotal,
             'resolvedSectors' => $resolvedSectors,
         ]);
     }

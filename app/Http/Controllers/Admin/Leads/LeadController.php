@@ -176,6 +176,7 @@ class LeadController extends Controller
         $sectorCounts = $this->candidateSectors->sectorFeaturesAvailable()
             ? $this->candidateSectors->leadCategoryCounts($sectorCountsQuery)
             : [];
+        $sectorGrandTotal = (clone $sectorCountsQuery)->count();
 
         return view('admin.leads.index', [
             'leads' => $leads,
@@ -198,6 +199,7 @@ class LeadController extends Controller
             'bulkManagerActorLabel' => $this->bulkManagerActorLabel($admin),
             'sectorCatalog' => $this->candidateSectors->catalog(),
             'sectorCounts' => $sectorCounts,
+            'sectorGrandTotal' => $sectorGrandTotal,
             'resolvedLeadSectors' => $resolvedLeadSectors,
         ]);
     }

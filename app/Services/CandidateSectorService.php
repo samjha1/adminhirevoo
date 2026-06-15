@@ -6,6 +6,7 @@ use App\Models\Hirevo\HirevoCandidateProfile;
 use App\Models\Hirevo\HirevoLead;
 use App\Models\Hirevo\HirevoUser;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -33,14 +34,8 @@ class CandidateSectorService
     public function keywordsForCategory(string $categoryKey): array
     {
         $category = $this->catalog()[$categoryKey] ?? [];
-        $keywords = $category['keywords'] ?? [];
-        $short = trim((string) ($category['short'] ?? ''));
 
-        if ($short !== '' && ! in_array(mb_strtolower($short), array_map('mb_strtolower', $keywords), true)) {
-            $keywords[] = $short;
-        }
-
-        return array_values(array_unique(array_filter($keywords)));
+        return array_values(array_unique(array_filter($category['keywords'] ?? [])));
     }
 
     public function labelForCategory(?string $categoryKey): string
@@ -73,40 +68,8 @@ class CandidateSectorService
             return;
         }
 
-        if ($categoryKey === 'uncategorized') {
-            $query->where(function (Builder $outer) {
-                $outer->whereDoesntHave('leads', fn (Builder $lq) => $lq->whereHas('jobRole', fn (Builder $rq) => $rq->whereNotNull('sector')))
-                    ->whereDoesntHave('jobApplications', fn (Builder $jq) => $jq->whereHas('jobRole', fn (Builder $rq) => $rq->whereNotNull('sector')));
-
-                if ($this->profilesAvailable()) {
-                    $outer->whereDoesntHave('candidateProfile', fn (Builder $pq) => $this->profileMatchesKnownSector($pq));
-                }
-
-                if ($this->resumesAvailable()) {
-                    $outer->whereDoesntHave('resumes', fn (Builder $rq) => $this->resumeMatchesKnownSector($rq));
-                }
-            });
-
-            return;
-        }
-
-        $roleSectors = $this->roleSectorsForCategory($categoryKey);
-        if ($roleSectors === []) {
-            return;
-        }
-
-        $query->where(function (Builder $outer) use ($roleSectors, $categoryKey) {
-            $outer->whereHas('leads', fn (Builder $lq) => $lq->whereHas('jobRole', fn (Builder $rq) => $rq->whereIn('sector', $roleSectors)))
-                ->orWhereHas('jobApplications', fn (Builder $jq) => $jq->whereHas('jobRole', fn (Builder $rq) => $rq->whereIn('sector', $roleSectors)));
-
-            if ($this->profilesAvailable()) {
-                $outer->orWhereHas('candidateProfile', fn (Builder $pq) => $this->profileMatchesCategory($pq, $categoryKey));
-            }
-
-            if ($this->resumesAvailable()) {
-                $outer->orWhereHas('resumes', fn (Builder $rq) => $this->resumeMatchesCategory($rq, $categoryKey));
-            }
-        });
+        $ids = $this->resolvedCandidateIds($query, $categoryKey);
+        $query->whereIn($query->getModel()->getQualifiedKeyName(), $ids ?: [-1]);
     }
 
     public function applyLeadFilter(Builder $query, string $categoryKey): void
@@ -115,78 +78,13 @@ class CandidateSectorService
             return;
         }
 
-        if ($categoryKey === 'uncategorized') {
-            $query->where(function (Builder $outer) {
-                $outer->where(function (Builder $roleQ) {
-                    $roleQ->whereDoesntHave('jobRole')
-                        ->orWhereHas('jobRole', function (Builder $rq) {
-                            $rq->whereNull('sector')
-                                ->where(function (Builder $titleQ) {
-                                    foreach ($this->allKeywords() as $keyword) {
-                                        $titleQ->where('title', 'not like', '%'.$keyword.'%');
-                                    }
-                                });
-                        });
-                });
-
-                if ($this->profilesAvailable()) {
-                    $outer->whereDoesntHave('candidate.candidateProfile', fn (Builder $pq) => $this->profileMatchesKnownSector($pq));
-                }
-
-                if ($this->resumesAvailable()) {
-                    $outer->whereDoesntHave('candidate.resumes', fn (Builder $rq) => $this->resumeMatchesKnownSector($rq));
-                }
-
-                $outer->where(function (Builder $textQ) {
-                    $textQ->whereNull('lead_summary')
-                        ->orWhere(function (Builder $summaryQ) {
-                            foreach ($this->allKeywords() as $keyword) {
-                                $summaryQ->where('lead_summary', 'not like', '%'.$keyword.'%');
-                            }
-                        });
-                });
-            });
-
-            return;
-        }
-
-        $roleSectors = $this->roleSectorsForCategory($categoryKey);
-        if ($roleSectors === []) {
-            return;
-        }
-
-        $keywords = $this->keywordsForCategory($categoryKey);
-
-        $query->where(function (Builder $outer) use ($roleSectors, $categoryKey, $keywords) {
-            $outer->whereHas('jobRole', fn (Builder $rq) => $rq->whereIn('sector', $roleSectors));
-
-            if ($this->profilesAvailable()) {
-                $outer->orWhereHas('candidate.candidateProfile', fn (Builder $pq) => $this->profileMatchesCategory($pq, $categoryKey));
-            }
-
-            if ($this->resumesAvailable()) {
-                $outer->orWhereHas('candidate.resumes', fn (Builder $rq) => $this->resumeMatchesCategory($rq, $categoryKey));
-            }
-
-            if ($keywords !== []) {
-                $outer->orWhere(function (Builder $textQ) use ($keywords) {
-                    foreach ($keywords as $keyword) {
-                        $textQ->orWhere('lead_summary', 'like', '%'.$keyword.'%');
-                    }
-                });
-            }
-
-            $outer->orWhereHas('jobRole', function (Builder $rq) use ($keywords) {
-                $rq->where(function (Builder $titleQ) use ($keywords) {
-                    foreach ($keywords as $keyword) {
-                        $titleQ->orWhere('title', 'like', '%'.$keyword.'%');
-                    }
-                });
-            });
-        });
+        $ids = $this->resolvedLeadIds($query, $categoryKey);
+        $query->whereIn($query->getModel()->getQualifiedKeyName(), $ids ?: [-1]);
     }
 
     /**
+     * Each candidate is counted in exactly one bucket (no double-counting).
+     *
      * @param  Builder<HirevoUser>  $baseQuery
      * @return array<string, int>
      */
@@ -196,16 +94,16 @@ class CandidateSectorService
             return [];
         }
 
-        $counts = [];
-        foreach (array_keys($this->catalog()) as $key) {
-            $counts[$key] = (clone $baseQuery)->tap(fn (Builder $q) => $this->applyCandidateFilter($q, $key))->count();
-        }
-        $counts['uncategorized'] = (clone $baseQuery)->tap(fn (Builder $q) => $this->applyCandidateFilter($q, 'uncategorized'))->count();
-
-        return $counts;
+        return $this->bucketExclusive(
+            array_merge(array_keys($this->catalog()), ['uncategorized']),
+            $this->loadCandidatesForResolution($baseQuery),
+            fn (HirevoUser $candidate) => $this->resolveForCandidate($candidate),
+        );
     }
 
     /**
+     * Each lead is counted in exactly one bucket (no double-counting).
+     *
      * @param  Builder<HirevoLead>  $baseQuery
      * @return array<string, int>
      */
@@ -215,13 +113,11 @@ class CandidateSectorService
             return [];
         }
 
-        $counts = [];
-        foreach (array_keys($this->catalog()) as $key) {
-            $counts[$key] = (clone $baseQuery)->tap(fn (Builder $q) => $this->applyLeadFilter($q, $key))->count();
-        }
-        $counts['uncategorized'] = (clone $baseQuery)->tap(fn (Builder $q) => $this->applyLeadFilter($q, 'uncategorized'))->count();
-
-        return $counts;
+        return $this->bucketExclusive(
+            array_merge(array_keys($this->catalog()), ['uncategorized']),
+            $this->loadLeadsForResolution($baseQuery),
+            fn (HirevoLead $lead) => $this->resolveForLead($lead),
+        );
     }
 
     public function resolveForCandidate(HirevoUser $candidate): ?string
@@ -230,55 +126,15 @@ class CandidateSectorService
             return null;
         }
 
-        $candidate->loadMissing([
-            'leads' => fn ($q) => $q->with('jobRole')->orderByDesc('created_at')->limit(1),
-            'jobApplications' => fn ($q) => $q->with('jobRole')->orderByDesc('created_at')->limit(1),
-        ]);
+        $this->ensureCandidateRelations($candidate);
 
-        if ($this->profilesAvailable()) {
-            $candidate->loadMissing('candidateProfile');
-        }
-
-        if ($this->resumesAvailable()) {
-            $candidate->loadMissing([
-                'resumes' => fn ($q) => $q->orderByDesc('is_primary')->orderByDesc('created_at')->limit(3),
-            ]);
-        }
-
-        $leadSector = $candidate->leads->first()?->jobRole?->sector;
-        if ($leadSector) {
-            return $this->categoryForRoleSector($leadSector);
-        }
-
-        $applicationSector = $candidate->jobApplications->first()?->jobRole?->sector;
-        if ($applicationSector) {
-            return $this->categoryForRoleSector($applicationSector);
-        }
-
-        $leadRoleTitle = $candidate->leads->first()?->jobRole?->title;
-        if ($leadRoleTitle) {
-            $fromTitle = $this->resolveCategoryFromText($leadRoleTitle);
-            if ($fromTitle !== null) {
-                return $fromTitle;
-            }
-        }
-
-        $profile = $candidate->candidateProfile;
-        if ($profile instanceof HirevoCandidateProfile && $this->profilesAvailable()) {
-            $fromProfile = $this->resolveCategoryFromProfile($profile);
-            if ($fromProfile !== null) {
-                return $fromProfile;
-            }
-        }
-
-        foreach ($candidate->resumes ?? [] as $resume) {
-            $fromResume = $this->resolveCategoryFromText((string) ($resume->ai_summary ?? ''));
-            if ($fromResume !== null) {
-                return $fromResume;
-            }
-        }
-
-        return null;
+        return $this->resolveFromSignals(
+            $this->candidateTextBlob($candidate),
+            $candidate->leads->first()?->jobRole?->sector,
+            $candidate->leads->first()?->jobRole?->title,
+            $candidate->jobApplications->first()?->jobRole?->sector,
+            $candidate->jobApplications->first()?->jobRole?->title,
+        );
     }
 
     public function resolveForLead(HirevoLead $lead): ?string
@@ -287,63 +143,56 @@ class CandidateSectorService
             return null;
         }
 
-        $lead->loadMissing(['jobRole', 'candidate']);
+        $this->ensureLeadRelations($lead);
 
-        if ($lead->jobRole?->sector) {
-            return $this->categoryForRoleSector($lead->jobRole->sector);
+        return $this->resolveFromSignals(
+            $this->leadTextBlob($lead),
+            $lead->jobRole?->sector,
+            $lead->jobRole?->title,
+        );
+    }
+
+    /**
+     * Pick one primary sector from combined text + optional job-role hints.
+     */
+    private function resolveFromSignals(
+        string $textBlob,
+        ?string $jobSector = null,
+        ?string $jobTitle = null,
+        ?string $fallbackJobSector = null,
+        ?string $fallbackJobTitle = null,
+    ): ?string {
+        $fromText = $this->resolveCategoryFromText($textBlob);
+        $textScore = $fromText !== null ? $this->scoreTextForCategory($textBlob, $fromText) : 0;
+
+        $jobCategory = $jobSector ? $this->categoryForRoleSector($jobSector) : null;
+        $titleCategory = $jobTitle ? $this->resolveCategoryFromText($jobTitle) : null;
+
+        if ($jobCategory && $titleCategory && $jobCategory === $titleCategory) {
+            return $jobCategory;
         }
 
-        if ($lead->jobRole?->title) {
-            $fromTitle = $this->resolveCategoryFromText($lead->jobRole->title);
-            if ($fromTitle !== null) {
-                return $fromTitle;
-            }
+        if ($fromText !== null && $textScore >= 2) {
+            return $fromText;
         }
 
-        if (filled($lead->lead_summary)) {
-            $fromSummary = $this->resolveCategoryFromText((string) $lead->lead_summary);
-            if ($fromSummary !== null) {
-                return $fromSummary;
-            }
+        if ($titleCategory !== null) {
+            return $titleCategory;
         }
 
-        if ($this->profilesAvailable()) {
-            $lead->loadMissing('candidate.candidateProfile');
-            $profile = $lead->candidate?->candidateProfile;
-            if ($profile instanceof HirevoCandidateProfile) {
-                $fromProfile = $this->resolveCategoryFromProfile($profile);
-                if ($fromProfile !== null) {
-                    return $fromProfile;
-                }
-            }
+        if ($jobCategory !== null) {
+            return $jobCategory;
         }
 
-        if ($this->resumesAvailable()) {
-            $lead->loadMissing([
-                'candidate.resumes' => fn ($q) => $q->orderByDesc('is_primary')->orderByDesc('created_at')->limit(3),
-            ]);
+        if ($fromText !== null) {
+            return $fromText;
+        }
 
-            foreach ($lead->candidate?->resumes ?? [] as $resume) {
-                $fromResume = $this->resolveCategoryFromText((string) ($resume->ai_summary ?? ''));
-                if ($fromResume !== null) {
-                    return $fromResume;
-                }
-            }
+        if ($fallbackJobSector || $fallbackJobTitle) {
+            return $this->resolveFromSignals('', $fallbackJobSector, $fallbackJobTitle);
         }
 
         return null;
-    }
-
-    private function resolveCategoryFromProfile(HirevoCandidateProfile $profile): ?string
-    {
-        if ($profile->preferred_job_role) {
-            $sector = $this->lookupSectorForRoleTitle((string) $profile->preferred_job_role);
-            if ($sector) {
-                return $this->categoryForRoleSector($sector);
-            }
-        }
-
-        return $this->resolveCategoryFromText($this->profileTextBlob($profile));
     }
 
     private function resolveCategoryFromText(string $text): ?string
@@ -357,20 +206,7 @@ class CandidateSectorService
         $bestScore = 0;
 
         foreach ($this->catalog() as $key => $category) {
-            $score = 0;
-
-            foreach ($category['role_sectors'] ?? [] as $roleSector) {
-                if (str_contains($haystack, str_replace('_', ' ', $roleSector))) {
-                    $score += 2;
-                }
-            }
-
-            foreach ($this->keywordsForCategory($key) as $keyword) {
-                $needle = mb_strtolower(trim($keyword));
-                if ($needle !== '' && str_contains($haystack, $needle)) {
-                    $score++;
-                }
-            }
+            $score = $this->scoreTextForCategory($haystack, $key);
 
             if ($score > $bestScore) {
                 $bestScore = $score;
@@ -381,7 +217,102 @@ class CandidateSectorService
         return $bestScore > 0 ? $bestKey : null;
     }
 
+    private function scoreTextForCategory(string $text, string $categoryKey): int
+    {
+        $haystack = mb_strtolower(trim($text));
+        if ($haystack === '') {
+            return 0;
+        }
+
+        $category = $this->catalog()[$categoryKey] ?? [];
+        $score = 0;
+
+        foreach ($category['role_sectors'] ?? [] as $roleSector) {
+            if ($this->textContainsKeyword($haystack, str_replace('_', ' ', $roleSector))) {
+                $score += 2;
+            }
+        }
+
+        foreach ($this->keywordsForCategory($categoryKey) as $keyword) {
+            if ($this->textContainsKeyword($haystack, $keyword)) {
+                $score++;
+            }
+        }
+
+        return $score;
+    }
+
+    private function textContainsKeyword(string $haystack, string $keyword): bool
+    {
+        $needle = mb_strtolower(trim($keyword));
+        if ($needle === '') {
+            return false;
+        }
+
+        if (mb_strlen($needle) < 5) {
+            return (bool) preg_match('/\b'.preg_quote($needle, '/').'\b/u', $haystack);
+        }
+
+        return str_contains($haystack, $needle);
+    }
+
+    private function leadTextBlob(HirevoLead $lead): string
+    {
+        $parts = array_filter([
+            $lead->jobRole?->title,
+            $lead->lead_summary,
+            $lead->referral_source ? str_replace('_', ' ', (string) $lead->referral_source) : null,
+            $lead->candidate?->candidateProfile instanceof HirevoCandidateProfile
+                ? $this->profileTextBlob($lead->candidate->candidateProfile)
+                : null,
+        ]);
+
+        foreach ($lead->candidate?->resumes ?? [] as $resume) {
+            if (filled($resume->ai_summary)) {
+                $parts[] = (string) $resume->ai_summary;
+            }
+        }
+
+        return implode(' ', $parts);
+    }
+
+    private function candidateTextBlob(HirevoUser $candidate): string
+    {
+        $parts = [];
+
+        if ($candidate->candidateProfile instanceof HirevoCandidateProfile) {
+            $parts[] = $this->profileTextBlob($candidate->candidateProfile);
+        }
+
+        foreach ($candidate->resumes ?? [] as $resume) {
+            if (filled($resume->ai_summary)) {
+                $parts[] = (string) $resume->ai_summary;
+            }
+        }
+
+        $parts[] = $candidate->leads->first()?->jobRole?->title;
+        $parts[] = $candidate->jobApplications->first()?->jobRole?->title;
+
+        return implode(' ', array_filter($parts));
+    }
+
     private function profileTextBlob(HirevoCandidateProfile $profile): string
+    {
+        if ($profile->preferred_job_role) {
+            $sector = $this->lookupSectorForRoleTitle((string) $profile->preferred_job_role);
+            if ($sector) {
+                return implode(' ', array_filter([
+                    $profile->preferred_job_role,
+                    str_replace('_', ' ', $sector),
+                    $this->profileRawTextBlob($profile),
+                ]));
+            }
+        }
+
+        return $this->profileRawTextBlob($profile);
+    }
+
+    private function profileRawTextBlob(HirevoCandidateProfile $profile): string
     {
         $parts = [];
         foreach ($this->profileTextColumns() as $column) {
@@ -421,90 +352,145 @@ class CandidateSectorService
         return $this->profileTextColumns;
     }
 
-    /** @param  Builder<HirevoCandidateProfile>  $query */
-    private function profileMatchesCategory(Builder $query, string $categoryKey): void
+    /**
+     * @template T
+     * @param  list<string>  $bucketKeys
+     * @param  Collection<int, T>  $records
+     * @param  callable(T): (?string)  $resolver
+     * @return array<string, int>
+     */
+    private function bucketExclusive(array $bucketKeys, Collection $records, callable $resolver): array
     {
-        $roleSectors = $this->roleSectorsForCategory($categoryKey);
-        $keywords = $this->keywordsForCategory($categoryKey);
+        $counts = array_fill_keys($bucketKeys, 0);
 
-        $query->where(function (Builder $pq) use ($roleSectors, $keywords) {
-            if ($roleSectors !== []) {
-                $pq->whereExists(function ($sub) use ($roleSectors) {
-                    $sub->select(DB::raw(1))
-                        ->from('job_roles')
-                        ->whereIn('job_roles.sector', $roleSectors)
-                        ->where(function ($jq) {
-                            $jq->whereColumn('job_roles.title', 'candidate_profiles.preferred_job_role')
-                                ->orWhereRaw('candidate_profiles.preferred_job_role LIKE CONCAT(\'%\', job_roles.title, \'%\')')
-                                ->orWhereRaw('job_roles.title LIKE CONCAT(\'%\', candidate_profiles.preferred_job_role, \'%\')');
-                        });
-                });
+        foreach ($records as $record) {
+            $key = $resolver($record) ?? 'uncategorized';
+            if (! array_key_exists($key, $counts)) {
+                $key = 'other';
             }
+            $counts[$key]++;
+        }
 
-            $this->applyKeywordLikes($pq, $keywords);
-        });
+        return $counts;
     }
 
-    /** @param  Builder<HirevoCandidateProfile>  $query */
-    private function profileMatchesKnownSector(Builder $query): void
+    /** @return Collection<int, HirevoLead> */
+    private function loadLeadsForResolution(Builder $baseQuery): Collection
     {
-        $query->where(function (Builder $pq) {
-            $pq->whereExists(function ($sub) {
-                $sub->select(DB::raw(1))
-                    ->from('job_roles')
-                    ->whereNotNull('job_roles.sector')
-                    ->where(function ($jq) {
-                        $jq->whereColumn('job_roles.title', 'candidate_profiles.preferred_job_role')
-                            ->orWhereRaw('candidate_profiles.preferred_job_role LIKE CONCAT(\'%\', job_roles.title, \'%\')')
-                            ->orWhereRaw('job_roles.title LIKE CONCAT(\'%\', candidate_profiles.preferred_job_role, \'%\')');
-                    });
-            });
+        $leads = collect();
 
-            $this->applyKeywordLikes($pq, $this->allKeywords());
-        });
+        (clone $baseQuery)
+            ->select('leads.*')
+            ->with($this->leadEagerRelations())
+            ->orderBy('leads.id')
+            ->chunkById(100, function ($chunk) use ($leads): void {
+                $leads->push(...$chunk);
+            }, 'leads.id', 'id');
+
+        return $leads;
     }
 
-    /** @param  Builder<\Illuminate\Database\Eloquent\Model>  $query */
-    private function resumeMatchesCategory(Builder $query, string $categoryKey): void
+    /** @return Collection<int, HirevoUser> */
+    private function loadCandidatesForResolution(Builder $baseQuery): Collection
     {
-        $keywords = $this->keywordsForCategory($categoryKey);
+        $candidates = collect();
 
-        $query->where(function (Builder $rq) use ($keywords) {
-            foreach ($keywords as $keyword) {
-                $rq->orWhere('ai_summary', 'like', '%'.$keyword.'%');
-            }
-        });
+        (clone $baseQuery)
+            ->select('users.*')
+            ->with($this->candidateEagerRelations())
+            ->orderBy('users.id')
+            ->chunkById(100, function ($chunk) use ($candidates): void {
+                $candidates->push(...$chunk);
+            }, 'users.id', 'id');
+
+        return $candidates;
     }
 
-    /** @param  Builder<\Illuminate\Database\Eloquent\Model>  $query */
-    private function resumeMatchesKnownSector(Builder $query): void
+    /**
+     * @param  Builder<HirevoLead>  $baseQuery
+     * @return list<int>
+     */
+    private function resolvedLeadIds(Builder $baseQuery, string $categoryKey): array
     {
-        $query->where(function (Builder $rq) {
-            foreach ($this->allKeywords() as $keyword) {
-                $rq->orWhere('ai_summary', 'like', '%'.$keyword.'%');
-            }
-        });
-    }
+        $want = $categoryKey === 'uncategorized' ? null : $categoryKey;
+        $ids = [];
 
-    /** @param  Builder<HirevoCandidateProfile>  $query */
-    private function applyKeywordLikes(Builder $query, array $keywords): void
-    {
-        foreach ($keywords as $keyword) {
-            foreach ($this->profileTextColumns() as $column) {
-                $query->orWhere($column, 'like', '%'.$keyword.'%');
+        foreach ($this->loadLeadsForResolution($baseQuery) as $lead) {
+            $resolved = $this->resolveForLead($lead);
+            if ($want === null && $resolved === null) {
+                $ids[] = (int) $lead->id;
+            } elseif ($resolved === $want) {
+                $ids[] = (int) $lead->id;
             }
         }
+
+        return $ids;
+    }
+
+    /**
+     * @param  Builder<HirevoUser>  $baseQuery
+     * @return list<int>
+     */
+    private function resolvedCandidateIds(Builder $baseQuery, string $categoryKey): array
+    {
+        $want = $categoryKey === 'uncategorized' ? null : $categoryKey;
+        $ids = [];
+
+        foreach ($this->loadCandidatesForResolution($baseQuery) as $candidate) {
+            $resolved = $this->resolveForCandidate($candidate);
+            if ($want === null && $resolved === null) {
+                $ids[] = (int) $candidate->id;
+            } elseif ($resolved === $want) {
+                $ids[] = (int) $candidate->id;
+            }
+        }
+
+        return $ids;
     }
 
     /** @return list<string> */
-    private function allKeywords(): array
+    private function leadEagerRelations(): array
     {
-        $keywords = [];
-        foreach (array_keys($this->catalog()) as $key) {
-            $keywords = array_merge($keywords, $this->keywordsForCategory($key));
+        $relations = ['jobRole', 'candidate'];
+
+        if ($this->profilesAvailable()) {
+            $relations[] = 'candidate.candidateProfile';
         }
 
-        return array_values(array_unique($keywords));
+        if ($this->resumesAvailable()) {
+            $relations['candidate.resumes'] = fn ($q) => $q->orderByDesc('is_primary')->orderByDesc('created_at')->limit(3);
+        }
+
+        return $relations;
+    }
+
+    /** @return list<string|array<string, mixed>> */
+    private function candidateEagerRelations(): array
+    {
+        $relations = [
+            'leads' => fn ($q) => $q->with('jobRole')->orderByDesc('created_at')->limit(1),
+            'jobApplications' => fn ($q) => $q->with('jobRole')->orderByDesc('created_at')->limit(1),
+        ];
+
+        if ($this->profilesAvailable()) {
+            $relations[] = 'candidateProfile';
+        }
+
+        if ($this->resumesAvailable()) {
+            $relations['resumes'] = fn ($q) => $q->orderByDesc('is_primary')->orderByDesc('created_at')->limit(3);
+        }
+
+        return $relations;
+    }
+
+    private function ensureLeadRelations(HirevoLead $lead): void
+    {
+        $lead->loadMissing($this->leadEagerRelations());
+    }
+
+    private function ensureCandidateRelations(HirevoUser $candidate): void
+    {
+        $candidate->loadMissing($this->candidateEagerRelations());
     }
 
     private function lookupSectorForRoleTitle(string $roleTitle): ?string
