@@ -50,13 +50,19 @@ class AdsManagerLeadImportService
             throw new RuntimeException('Upload failed. Check AWS S3 credentials and bucket permissions.');
         }
 
+        $path = str_replace('\\', '/', $path);
+
+        if (! Storage::disk($disk)->exists($path)) {
+            throw new RuntimeException('Upload verification failed: file was not saved to storage.');
+        }
+
         LeadsmanagerLeadFile::query()->create([
             'user_id' => $advertiserId,
             'campaign_id' => $campaignId,
             // Adminpanal users live in a separate table; uploaded_by FK targets leadsmanager_users only.
             'uploaded_by' => null,
             'original_filename' => $file->getClientOriginalName(),
-            'storage_path' => str_replace('\\', '/', $path),
+            'storage_path' => $path,
             'format' => $format,
             'file_size' => (int) $file->getSize(),
         ]);
@@ -96,6 +102,8 @@ class AdsManagerLeadImportService
             return 's3';
         }
 
-        return (string) config('filesystems.default', 'local');
+        throw new RuntimeException(
+            'AWS S3 is not configured on this server. Add AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION, and AWS_BUCKET to .env, then run php artisan config:clear.'
+        );
     }
 }
