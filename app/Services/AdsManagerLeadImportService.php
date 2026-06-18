@@ -102,8 +102,20 @@ class AdsManagerLeadImportService
             return 's3';
         }
 
+        $missing = [];
+        if ($key === '') {
+            $missing[] = 'AWS_ACCESS_KEY_ID';
+        }
+        if ($secret === '') {
+            $missing[] = 'AWS_SECRET_ACCESS_KEY';
+        }
+        if ($bucket === '') {
+            $missing[] = 'AWS_BUCKET';
+        }
+
         throw new RuntimeException(
-            'AWS S3 is not configured on this server. Add AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION, and AWS_BUCKET to .env, then run php artisan config:clear.'
+            'AWS S3 is not configured on the admin panel server. Missing or empty: '.implode(', ', $missing)
+            .'. Add them to adminpanal/.env (not leadsmanager), then run: php artisan config:clear'
         );
     }
 }
