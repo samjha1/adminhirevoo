@@ -53,7 +53,8 @@ class AdsManagerLeadImportService
         LeadsmanagerLeadFile::query()->create([
             'user_id' => $advertiserId,
             'campaign_id' => $campaignId,
-            'uploaded_by' => auth()->id(),
+            // Adminpanal users live in a separate table; uploaded_by FK targets leadsmanager_users only.
+            'uploaded_by' => null,
             'original_filename' => $file->getClientOriginalName(),
             'storage_path' => str_replace('\\', '/', $path),
             'format' => $format,
