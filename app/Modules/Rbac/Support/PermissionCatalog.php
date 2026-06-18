@@ -42,6 +42,7 @@ final class PermissionCatalog
             ['slug' => 'employer_payments.view', 'group' => 'platform', 'name' => 'View employer plan payments'],
             ['slug' => 'employer_payments.complete', 'group' => 'platform', 'name' => 'Verify employer plan cheques'],
             ['slug' => 'platform.sponsored_ads', 'group' => 'platform', 'name' => 'Moderate sponsored ads'],
+            ['slug' => 'platform.ads_manager_leads', 'group' => 'platform', 'name' => 'Import Ads Manager leads'],
             // Job Portal module
             ['slug' => 'portal.dashboard.view', 'group' => 'portal', 'name' => 'View job portal dashboard'],
             ['slug' => 'portal.companies.view', 'group' => 'portal', 'name' => 'View companies'],
@@ -105,6 +106,7 @@ final class PermissionCatalog
                 'leads.view', 'leads.view_all', 'leads.create', 'leads.import', 'leads.export',
                 'leads.assign_manager', 'leads.reassign', 'leads.release', 'consultations.view',
                 'analytics.view', 'applications.view', 'employer_payments.view',
+                'platform.sponsored_ads', 'platform.ads_manager_leads',
             ],
             'asm' => [
                 'leads.view', 'leads.assign_employee', 'leads.reassign', 'leads.update_stage',

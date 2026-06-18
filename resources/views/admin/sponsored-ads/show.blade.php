@@ -7,16 +7,14 @@
         <div>
             <a href="{{ route('admin.sponsored-ads.index') }}" class="small text-muted text-decoration-none">← Sponsored ads</a>
             <h1 class="page-title mt-1">{{ $ad->name }}</h1>
-            <div class="page-subtitle">{{ $ad->placementLabel() }} · {{ $ad->advertiser?->email }}</div>
+            <div class="page-subtitle">{{ $ad->placementLabel() }} · {{ $ad->advertiser?->name ?? $ad->advertiser?->email }}</div>
         </div>
         <div class="d-flex flex-wrap gap-2">
-            @if($ad->status === 'pending_review')
+            @if($ad->isPendingReview())
                 <form method="POST" action="{{ route('admin.sponsored-ads.approve', $ad) }}">@csrf
                     <button type="submit" class="btn btn-success">Approve for Hirevo</button>
                 </form>
-                <form method="POST" action="{{ route('admin.sponsored-ads.reject', $ad) }}">@csrf
-                    <button type="submit" class="btn btn-outline-danger">Reject</button>
-                </form>
+                <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#reject-modal">Reject</button>
             @elseif($ad->status === 'active')
                 <form method="POST" action="{{ route('admin.sponsored-ads.pause', $ad) }}">@csrf
                     <button type="submit" class="btn btn-outline-secondary">Pause on Hirevo</button>
@@ -31,8 +29,8 @@
                 <div class="card-header fw-semibold">Hirevo preview</div>
                 <div class="card-body p-4">
                     <div class="border rounded-3 overflow-hidden" style="max-width:320px">
-                        @if($ad->image_url)
-                            <img src="{{ $ad->image_url }}" class="w-100" style="aspect-ratio:16/9;object-fit:cover" alt="">
+                        @if($ad->displayImageUrl())
+                            <img src="{{ $ad->displayImageUrl() }}" class="w-100" style="aspect-ratio:16/9;object-fit:cover" alt="">
                         @endif
                         <div class="p-3">
                             <div class="small text-muted text-uppercase fw-bold mb-1" style="font-size:0.65rem;letter-spacing:.08em">Sponsored</div>
@@ -51,18 +49,42 @@
                 <div class="card-body">
                     <dl class="row mb-0 small">
                         <dt class="col-sm-4 text-muted">Status</dt>
-                        <dd class="col-sm-8"><span class="badge text-bg-{{ $ad->statusBadge() }}">{{ str_replace('_', ' ', $ad->status) }}</span></dd>
+                        <dd class="col-sm-8"><span class="badge text-bg-{{ $ad->statusBadge() }}">{{ $ad->statusLabel() }}</span></dd>
                         <dt class="col-sm-4 text-muted">Campaign</dt>
                         <dd class="col-sm-8">{{ $ad->campaign?->name ?? '—' }} ({{ $ad->campaign?->status ?? 'n/a' }})</dd>
                         <dt class="col-sm-4 text-muted">Destination</dt>
                         <dd class="col-sm-8 text-break"><a href="{{ $ad->destination_url }}" target="_blank" rel="noopener">{{ $ad->destination_url }}</a></dd>
                         <dt class="col-sm-4 text-muted">Targeting</dt>
                         <dd class="col-sm-8">{{ $ad->target_area ?? '—' }} · {{ $ad->target_age_group ?? '—' }}</dd>
+                        @if($ad->rejection_reason)
+                            <dt class="col-sm-4 text-muted">Rejection</dt>
+                            <dd class="col-sm-8 text-danger">{{ $ad->rejection_reason }}</dd>
+                        @endif
                         <dt class="col-sm-4 text-muted">Stats</dt>
                         <dd class="col-sm-8">{{ number_format($ad->impressions_count) }} views · {{ number_format($ad->clicks_count) }} clicks · {{ number_format($ad->leads_count) }} leads</dd>
                     </dl>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="reject-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <form method="POST" action="{{ route('admin.sponsored-ads.reject', $ad) }}" class="modal-content">
+                @csrf
+                <div class="modal-header">
+                    <h5 class="modal-title">Reject ad</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label">Reason</label>
+                    <textarea name="reason" class="form-control" rows="4" required placeholder="Why is this creative being rejected?"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Reject</button>
+                </div>
+            </form>
         </div>
     </div>
 @endsection

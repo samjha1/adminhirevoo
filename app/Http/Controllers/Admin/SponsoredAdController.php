@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Leadsmanager\LeadsmanagerAd;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 
@@ -15,14 +16,18 @@ class SponsoredAdController extends Controller
     {
         abort_unless(Schema::hasTable('leadsmanager_ads'), 503, 'Ads Manager tables are not available.');
 
-        $status = $request->query('status', 'pending_review');
+        $status = $request->query('status', 'under_review');
 
         $query = LeadsmanagerAd::query()
             ->with(['campaign', 'advertiser'])
             ->orderByDesc('updated_at');
 
-        if ($status && $status !== 'all' && in_array($status, LeadsmanagerAd::STATUSES, true)) {
-            $query->where('status', $status);
+        if ($status && $status !== 'all') {
+            if ($status === 'under_review') {
+                $query->whereIn('status', LeadsmanagerAd::REVIEW_STATUSES);
+            } elseif (in_array($status, LeadsmanagerAd::STATUSES, true)) {
+                $query->where('status', $status);
+            }
         }
 
         if ($search = trim((string) $request->query('q', ''))) {
@@ -36,7 +41,9 @@ class SponsoredAdController extends Controller
             $query->where('placement', $placement);
         }
 
-        $pendingCount = LeadsmanagerAd::where('status', 'pending_review')->count();
+        $pendingCount = LeadsmanagerAd::query()
+            ->whereIn('status', LeadsmanagerAd::REVIEW_STATUSES)
+            ->count();
 
         return view('admin.sponsored-ads.index', [
             'ads' => $query->paginate(20)->withQueryString(),
@@ -55,22 +62,53 @@ class SponsoredAdController extends Controller
 
     public function approve(LeadsmanagerAd $ad): RedirectResponse
     {
-        if ($ad->campaign && $ad->campaign->status !== 'active') {
-            return back()->with('error', 'Activate the advertiser’s campaign in Ads Manager before approving this ad.');
+        if (! $ad->isPendingReview() && $ad->status !== 'approved') {
+            return back()->with('error', 'Only ads under review can be approved.');
         }
 
-        $ad->update(['status' => 'active']);
+        if ($ad->campaign && in_array($ad->campaign->status, ['completed', 'rejected'], true)) {
+            return back()->with('error', 'This campaign is completed or rejected and cannot go live.');
+        }
+
+        $campaignActivated = false;
+
+        DB::transaction(function () use ($ad, &$campaignActivated): void {
+            if ($ad->campaign && $ad->campaign->status !== 'active') {
+                $ad->campaign->update([
+                    'status' => 'active',
+                    'approved_at' => $ad->campaign->approved_at ?? now(),
+                ]);
+                $campaignActivated = true;
+            }
+
+            $ad->update([
+                'status' => 'active',
+                'rejection_reason' => null,
+            ]);
+        });
+
+        $message = "“{$ad->name}” approved — now live on Hirevo ({$ad->placementLabel()}).";
+        if ($campaignActivated && $ad->campaign) {
+            $message .= " Campaign “{$ad->campaign->name}” was activated.";
+        }
 
         return redirect()
             ->route('admin.sponsored-ads.index', ['status' => 'active'])
-            ->with('success', "“{$ad->name}” approved — now live on Hirevo ({$ad->placementLabel()}).");
+            ->with('success', $message);
     }
 
-    public function reject(LeadsmanagerAd $ad): RedirectResponse
+    public function reject(Request $request, LeadsmanagerAd $ad): RedirectResponse
     {
-        $ad->update(['status' => 'draft']);
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'max:2000'],
+        ]);
 
-        return back()->with('success', "“{$ad->name}” sent back to draft.");
+        $ad->update([
+            'status' => 'rejected',
+            'rejection_reason' => $data['reason'],
+        ]);
+
+        return back()->with('success', "“{$ad->name}” rejected.");
     }
 
     public function pause(LeadsmanagerAd $ad): RedirectResponse

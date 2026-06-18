@@ -1,0 +1,5 @@
+<?php
+
+return [
+    'api_base_url' => rtrim(env('LEADSMANAGER_URL', 'http://127.0.0.1:8003'), '/'),
+];

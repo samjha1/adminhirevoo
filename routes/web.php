@@ -17,6 +17,7 @@ use App\Http\Controllers\Admin\EmployerPlanPaymentController;
 use App\Http\Controllers\Admin\ReferralController;
 use App\Http\Controllers\Admin\ReferralFormSubmissionController;
 use App\Http\Controllers\Admin\Settings\RbacSettingsController;
+use App\Http\Controllers\Admin\AdsManagerLeadController;
 use App\Http\Controllers\Admin\SponsoredAdController;
 use App\Http\Controllers\Admin\Staff\AdminStaffController;
 use App\Http\Controllers\Admin\Users\HirevoUserController;
@@ -305,4 +306,14 @@ Route::middleware(['admin.guard', 'auth:admin', 'role:admin|super_admin|recruite
     Route::post('/sponsored-ads/{ad}/pause', [SponsoredAdController::class, 'pause'])
         ->middleware('permission:platform.sponsored_ads')
         ->name('admin.sponsored-ads.pause');
+
+    Route::get('/ads-manager/leads', [AdsManagerLeadController::class, 'index'])
+        ->middleware('permission:platform.ads_manager_leads')
+        ->name('admin.ads-manager.leads.index');
+    Route::post('/ads-manager/leads/upload-bulk', [AdsManagerLeadController::class, 'uploadBulk'])
+        ->middleware('permission:platform.ads_manager_leads')
+        ->name('admin.ads-manager.leads.upload-bulk');
+    Route::post('/ads-manager/leads/assign', [AdsManagerLeadController::class, 'assign'])
+        ->middleware('permission:platform.ads_manager_leads')
+        ->name('admin.ads-manager.leads.assign');
 });

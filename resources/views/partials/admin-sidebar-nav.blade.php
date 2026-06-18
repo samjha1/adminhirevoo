@@ -129,6 +129,40 @@
         </div>
     @endif
 
+    @if($can('platform.sponsored_ads') || $can('platform.ads_manager_leads'))
+        <div class="sidebar-group">
+            <div class="sidebar-group-label">
+                <i class="bi bi-badge-ad"></i>
+                <span>Ads Manager</span>
+            </div>
+            <div class="sidebar-group-links">
+                @if($can('platform.sponsored_ads'))
+                    <a class="sidebar-link @if(request()->routeIs('admin.sponsored-ads.*')) is-active @endif"
+                       href="{{ route('admin.sponsored-ads.index') }}">
+                        <span class="sidebar-link-icon"><i class="bi bi-badge-ad"></i></span>
+                        <span class="sidebar-link-text">
+                            <span class="sidebar-link-label">Sponsored ads</span>
+                            <span class="sidebar-link-sub">Approve for Hirevo</span>
+                        </span>
+                        @if(($sponsoredAdsPending ?? 0) > 0)
+                            <span class="sidebar-link-badge">{{ $sponsoredAdsPending }}</span>
+                        @endif
+                    </a>
+                @endif
+                @if($can('platform.ads_manager_leads'))
+                    <a class="sidebar-link @if(request()->routeIs('admin.ads-manager.leads.*')) is-active @endif"
+                       href="{{ route('admin.ads-manager.leads.index') }}">
+                        <span class="sidebar-link-icon"><i class="bi bi-file-earmark-spreadsheet"></i></span>
+                        <span class="sidebar-link-text">
+                            <span class="sidebar-link-label">Advertiser leads</span>
+                            <span class="sidebar-link-sub">CSV import</span>
+                        </span>
+                    </a>
+                @endif
+            </div>
+        </div>
+    @endif
+
     @if($can('portal.dashboard.view') || $can('portal.jobs.view') || $can('portal.applications.view') || $can('portal.reports.view'))
         <div class="sidebar-group sidebar-group--portal">
             <div class="sidebar-group-label">
