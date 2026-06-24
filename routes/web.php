@@ -274,6 +274,18 @@ Route::middleware(['admin.guard', 'auth:admin', 'role:admin|super_admin|recruite
     Route::get('/jobs', [JobController::class, 'index'])
         ->middleware('permission:platform.jobs|portal.jobs.view')
         ->name('admin.jobs.index');
+    Route::get('/jobs/import', [JobController::class, 'importForm'])
+        ->middleware('permission:platform.jobs|portal.jobs.create')
+        ->name('admin.jobs.import');
+    Route::post('/jobs/import', [JobController::class, 'importStore'])
+        ->middleware('permission:platform.jobs|portal.jobs.create')
+        ->name('admin.jobs.import.store');
+    Route::get('/jobs/import/template', [JobController::class, 'downloadTemplate'])
+        ->middleware('permission:platform.jobs|portal.jobs.create')
+        ->name('admin.jobs.import.template');
+    Route::get('/jobs/import/sample', [JobController::class, 'downloadSample'])
+        ->middleware('permission:platform.jobs|portal.jobs.create')
+        ->name('admin.jobs.import.sample');
     Route::post('/jobs/{job}/status', [JobController::class, 'updateStatus'])
         ->middleware('permission:platform.jobs|portal.jobs.edit')
         ->name('admin.jobs.status');

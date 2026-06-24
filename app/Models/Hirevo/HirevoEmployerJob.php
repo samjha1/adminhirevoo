@@ -104,5 +104,24 @@ class HirevoEmployerJob extends Model
     {
         return $this->hasMany(HirevoEmployerJobApplication::class, 'employer_job_id');
     }
+
+    public function displayCompanyName(): string
+    {
+        $name = trim((string) ($this->company_name ?? ''));
+        if ($name !== '') {
+            return $name;
+        }
+
+        return trim((string) ($this->employer?->referrerProfile?->company_name ?? '')) ?: '—';
+    }
+
+    public function displayApplicationsCount(): int
+    {
+        if (isset($this->display_applications_count) && (int) $this->display_applications_count > 0) {
+            return (int) $this->display_applications_count;
+        }
+
+        return (int) ($this->applications_count ?? $this->applications()->count());
+    }
 }
 

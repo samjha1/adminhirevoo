@@ -20,12 +20,24 @@
                 <h1 class="portal-hero-title">Job listings</h1>
                 <p class="portal-hero-sub">Review, search, and moderate all employer job posts on the platform.</p>
             </div>
-            <div class="portal-hero-actions">
+            <div class="portal-hero-actions d-flex flex-wrap gap-2 align-items-center">
+                @if(auth('admin')->user()->canPermission('portal.jobs.create') || auth('admin')->user()->canPermission('platform.jobs'))
+                    <a href="{{ route('admin.jobs.import') }}" class="btn btn-primary" style="border-radius:10px;">
+                        <i class="bi bi-upload me-1"></i>Upload jobs
+                    </a>
+                @endif
                 <span class="badge rounded-pill bg-light text-dark px-3 py-2 fw-semibold">
                     <i class="bi bi-briefcase me-1"></i>{{ number_format($jobs->total()) }} total
                 </span>
             </div>
         </div>
+
+        @if(session('success'))
+            <div class="alert alert-success shadow-soft">{{ session('success') }}</div>
+        @endif
+        @if(session('warning'))
+            <div class="alert alert-warning shadow-soft">{{ session('warning') }}</div>
+        @endif
 
         @include('partials.portal-mini-stats', ['items' => [
             ['label' => 'All jobs', 'value' => $stats['total'] ?? 0, 'icon' => 'bi-collection', 'tone' => 'indigo'],
@@ -112,11 +124,11 @@
                                     <div class="small text-muted">{{ ucwords(str_replace('_', ' ', $job->job_type)) }}</div>
                                 @endif
                             </td>
-                            <td>{{ $job->employer?->referrerProfile?->company_name ?? $job->company_name ?? '—' }}</td>
+                            <td>{{ $job->displayCompanyName() }}</td>
                             <td><span class="text-muted">{{ $job->job_department ?? '—' }}</span></td>
                             <td><span class="text-muted">{{ $job->location_city }}</span></td>
                             <td><span class="portal-badge status-{{ $job->status }}">{{ $job->status }}</span></td>
-                            <td><strong>{{ $job->applications_count }}</strong></td>
+                            <td><strong>{{ $job->displayApplicationsCount() }}</strong></td>
                             <td class="text-muted small">{{ $job->created_at?->format('M j, Y') }}</td>
                             <td class="text-end">
                                 @if(auth('admin')->user()->canPermission('portal.jobs.edit') || auth('admin')->user()->canPermission('platform.jobs'))
