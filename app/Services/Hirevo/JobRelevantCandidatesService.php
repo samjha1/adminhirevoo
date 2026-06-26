@@ -36,28 +36,80 @@ class JobRelevantCandidatesService
         );
     }
 
+    /**
+     * @param  list<int>  $excludeUserIds
+     * @return list<int>
+     */
+    public function relevantCandidateIds(HirevoEmployerJob $job, ?string $categoryKey, array $excludeUserIds, bool $showAll): array
+    {
+        if ($showAll) {
+            $ids = $this->sectors->allCandidateIdsCached($excludeUserIds);
+        } elseif ($categoryKey === null || $categoryKey === '') {
+            return [];
+        } else {
+            $ids = $this->sectors->candidateIdsForCategoryCached($categoryKey, $excludeUserIds);
+        }
+
+        return $this->sortCandidateIdsByJobMatch($job, $ids);
+    }
+
+    /**
+     * @param  list<int>  $ids
+     * @return list<int>
+     */
+    private function sortCandidateIdsByJobMatch(HirevoEmployerJob $job, array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        $stamp = $job->updated_at?->getTimestamp() ?? 0;
+        $cacheKey = 'portal.job.'.$job->id.'.sorted_ids.'.$stamp.'.'.md5(implode(',', $ids));
+
+        return Cache::remember(
+            $cacheKey,
+            (int) config('hirevo_portal.job_relevant_sort_cache_ttl', 300),
+            function () use ($job, $ids) {
+                $scored = [];
+
+                foreach (array_chunk($ids, 100) as $chunk) {
+                    $users = HirevoUser::query()
+                        ->whereIn('id', $chunk)
+                        ->with([
+                            'candidateProfile',
+                            'resumes' => fn ($q) => $q->orderByDesc('is_primary')->orderByDesc('created_at')->limit(1),
+                        ])
+                        ->get();
+
+                    foreach ($users as $user) {
+                        $resume = $user->resumes->first();
+                        $scored[] = [
+                            'id' => (int) $user->id,
+                            'score' => $this->matchScore->scoreResumeAgainstJob(
+                                $resume,
+                                $job,
+                                is_string($user->candidateProfile?->skills) ? $user->candidateProfile->skills : null,
+                            ),
+                        ];
+                    }
+                }
+
+                usort($scored, fn (array $a, array $b) => $b['score'] <=> $a['score'] ?: $b['id'] <=> $a['id']);
+
+                return array_column($scored, 'id');
+            },
+        );
+    }
+
     public function resolveJobCategory(HirevoEmployerJob $job): ?string
     {
         $stamp = $job->updated_at?->getTimestamp() ?? 0;
 
         return Cache::remember(
-            "portal.job.{$job->id}.sector.{$stamp}",
+            "portal.job.{$job->id}.sector.v2.{$stamp}",
             (int) config('hirevo_portal.job_sector_cache_ttl', 3600),
             fn () => $this->sectors->resolveForJob($job),
         );
-    }
-
-    /**
-     * @param  list<int>  $excludeUserIds
-     * @return list<int>
-     */
-    public function relevantCandidateIds(?string $categoryKey, array $excludeUserIds, bool $showAll): array
-    {
-        if ($showAll || $categoryKey === null) {
-            return $this->sectors->allCandidateIdsCached($excludeUserIds);
-        }
-
-        return $this->sectors->candidateIdsForCategoryCached($categoryKey, $excludeUserIds);
     }
 
     /**

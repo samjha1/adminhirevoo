@@ -9,11 +9,13 @@ use App\Services\CandidateSectorService;
 use App\Services\Hirevo\HirevoEmployerJobApplicationService;
 use App\Services\Hirevo\HirevoEmployerJobImportService;
 use App\Services\Hirevo\JobRelevantCandidatesService;
+use App\Support\PortalApplyPermission;
 use App\Support\PortalDateFilter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -94,7 +96,7 @@ class JobController extends Controller
         $showAll = $request->boolean('show_all');
         $appliedUserIds = $this->relevantCandidates->appliedUserIds($job);
         $jobCategory = $this->relevantCandidates->resolveJobCategory($job);
-        $candidateIds = $this->relevantCandidates->relevantCandidateIds($jobCategory, $appliedUserIds, $showAll);
+        $candidateIds = $this->relevantCandidates->relevantCandidateIds($job, $jobCategory, $appliedUserIds, $showAll);
 
         if ($tab === 'applicants') {
             $applications = $this->relevantCandidates->paginateApplicants($request, $job);
@@ -116,7 +118,10 @@ class JobController extends Controller
             $relevantCandidates = $this->relevantCandidates->paginateRelevant($request, $job, $candidateIds);
         }
 
-        $canApply = auth('admin')->user()->canPermission('portal.applications.create');
+        $admin = auth('admin')->user();
+        $canApply = PortalApplyPermission::canApplyOnBehalf($admin);
+        $jobAcceptsApply = PortalApplyPermission::jobAcceptsRecruiterApply((string) $job->status);
+        $canApplyOnBehalf = $canApply && $jobAcceptsApply;
 
         $appShowRoute = Route::has('admin.portal.applications.show') && ! auth('admin')->user()->canPermission('leads.view')
             ? 'admin.portal.applications.show'
@@ -136,6 +141,8 @@ class JobController extends Controller
             'applicantCount' => count($appliedUserIds),
             'relevantCount' => count($candidateIds),
             'canApply' => $canApply,
+            'canApplyOnBehalf' => $canApplyOnBehalf,
+            'jobAcceptsApply' => $jobAcceptsApply,
             'appShowRoute' => $appShowRoute,
             'appStatusRoute' => $appStatusRoute,
         ]);
@@ -157,6 +164,7 @@ class JobController extends Controller
 
         if (count($result['applied']) > 0) {
             $this->relevantCandidates->invalidateJobCache($job->id);
+            Cache::forget('portal.job.'.$job->id.'.sector.v2.'.($job->updated_at?->getTimestamp() ?? 0));
         }
 
         $applied = count($result['applied']);

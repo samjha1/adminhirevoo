@@ -179,20 +179,24 @@
                 </form>
             </div>
 
-            @if($job->status !== 'active')
+            @if(!$jobAcceptsApply)
                 <div class="alert alert-warning shadow-soft">
-                    This job is <strong>{{ $job->status }}</strong>. Applications can only be submitted for active jobs.
+                    This job is <strong>{{ $job->status }}</strong>. Applications can only be submitted for active or draft jobs.
+                </div>
+            @elseif(!$canApply)
+                <div class="alert alert-info shadow-soft">
+                    You can view candidates but your account does not have permission to apply on behalf of candidates.
                 </div>
             @endif
 
-            @if($canApply && $job->status === 'active')
+            @if($canApplyOnBehalf)
                 <form method="POST" action="{{ route('admin.jobs.apply', $job->id) }}" id="bulk-apply-form" class="d-none">
                     @csrf
                 </form>
             @endif
 
             <div class="portal-table-card">
-                @if($canApply && $job->status === 'active')
+                @if($canApplyOnBehalf)
                     <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom bg-light">
                         <div class="small text-muted" id="selection-summary">Select candidates to apply</div>
                         <button type="submit" form="bulk-apply-form" class="btn btn-primary btn-sm" id="bulk-apply-btn" disabled style="border-radius:8px;">
@@ -204,7 +208,7 @@
                         <table class="table align-middle mb-0">
                             <thead>
                             <tr>
-                                @if($canApply && $job->status === 'active')
+                                @if($canApplyOnBehalf)
                                     <th style="width:40px;">
                                         <input type="checkbox" class="form-check-input" id="select-all-candidates" aria-label="Select all">
                                     </th>
@@ -214,7 +218,7 @@
                                 <th>Experience</th>
                                 <th>Match</th>
                                 <th>Resume</th>
-                                @if($canApply && $job->status === 'active')
+                                @if($canApplyOnBehalf)
                                     <th class="text-end">Action</th>
                                 @endif
                             </tr>
@@ -224,10 +228,10 @@
                                 @php
                                     $cProfile = $candidate->candidateProfile;
                                     $hasResume = (bool) ($candidate->has_resume ?? false);
-                                    $canSelect = $canApply && $job->status === 'active' && $hasResume;
+                                    $canSelect = $canApplyOnBehalf && $hasResume;
                                 @endphp
                                 <tr>
-                                    @if($canApply && $job->status === 'active')
+                                    @if($canApplyOnBehalf)
                                         <td>
                                             @if($canSelect)
                                                 <input type="checkbox" class="form-check-input candidate-checkbox"
@@ -263,26 +267,26 @@
                                             <span class="badge text-bg-danger-subtle text-danger" title="Resume required to apply">No</span>
                                         @endif
                                     </td>
-                                    @if($canApply && $job->status === 'active')
+                                    @if($canApplyOnBehalf)
                                         <td class="text-end">
                                             @if($canSelect)
                                                 <form method="POST" action="{{ route('admin.jobs.apply', $job->id) }}" class="d-inline"
                                                       onsubmit="return confirm('Apply {{ $candidate->name }} to this job?');">
                                                     @csrf
                                                     <input type="hidden" name="candidate_ids[]" value="{{ $candidate->id }}">
-                                                    <button type="submit" class="btn btn-sm btn-outline-primary" style="border-radius:8px;">
-                                                        Apply
+                                                    <button type="submit" class="btn btn-sm btn-primary" style="border-radius:8px;">
+                                                        <i class="bi bi-send-check me-1"></i>Apply
                                                     </button>
                                                 </form>
                                             @else
-                                                <span class="small text-muted">No resume</span>
+                                                <span class="small text-muted" title="Candidate needs a resume on file">No resume</span>
                                             @endif
                                         </td>
                                     @endif
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="{{ ($canApply && $job->status === 'active') ? 7 : 5 }}">
+                                    <td colspan="{{ $canApplyOnBehalf ? 7 : 5 }}">
                                         <div class="portal-empty">
                                             <i class="bi bi-person-x"></i>
                                             No relevant candidates found.

@@ -325,7 +325,7 @@ Route::middleware(['admin.guard', 'auth:admin', 'role:admin|super_admin|recruite
         ->middleware('permission:platform.jobs|portal.jobs.view')
         ->name('admin.jobs.show');
     Route::post('/jobs/{job}/apply', [JobController::class, 'apply'])
-        ->middleware('permission:portal.applications.create')
+        ->middleware('permission:portal.applications.create|portal.applications.update_status|portal.jobs.edit|platform.jobs|applications.view')
         ->name('admin.jobs.apply');
     Route::post('/jobs/{job}/status', [JobController::class, 'updateStatus'])
         ->middleware('permission:platform.jobs|portal.jobs.edit')

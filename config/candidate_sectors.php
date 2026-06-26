@@ -10,6 +10,7 @@ return [
         'short' => 'Tech',
         'role_sectors' => ['technology'],
         'keywords' => [
+            'engineering', 'engineer', 'developer', 'software', 'programmer', 'devops', 'data scientist',
             'software developer', 'software engineer', 'full stack', 'full-stack', 'fullstack',
             'backend developer', 'frontend developer', 'web developer', 'mobile developer',
             'data analyst', 'data scientist', 'data engineer', 'machine learning', 'ml engineer',

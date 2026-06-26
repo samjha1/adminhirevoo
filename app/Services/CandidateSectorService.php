@@ -162,6 +162,14 @@ class CandidateSectorService
             return null;
         }
 
+        $department = trim((string) ($job->job_department ?? ''));
+        if ($department !== '') {
+            $fromDepartment = $this->resolveCategoryFromDepartment($department);
+            if ($fromDepartment !== null) {
+                return $fromDepartment;
+            }
+        }
+
         $textBlob = $this->jobTextBlob($job);
         $title = trim((string) ($job->title ?? ''));
 
@@ -170,6 +178,53 @@ class CandidateSectorService
             null,
             $title !== '' ? $title : null,
         );
+    }
+
+    private function resolveCategoryFromDepartment(string $department): ?string
+    {
+        $dept = mb_strtolower(trim($department));
+        if ($dept === '') {
+            return null;
+        }
+
+        $aliases = [
+            'engineering' => 'technology',
+            'technology' => 'technology',
+            'information technology' => 'technology',
+            'it' => 'technology',
+            'software' => 'technology',
+            'tech' => 'technology',
+            'marketing' => 'sales_marketing',
+            'sales' => 'sales_marketing',
+            'business development' => 'sales_marketing',
+            'finance' => 'finance',
+            'banking' => 'finance',
+            'accounting' => 'finance',
+            'human resources' => 'hr_admin',
+            'hr' => 'hr_admin',
+            'recruitment' => 'hr_admin',
+            'operations' => 'operations',
+            'supply chain' => 'operations',
+            'logistics' => 'operations',
+            'healthcare' => 'healthcare',
+            'medical' => 'healthcare',
+            'education' => 'education',
+            'retail' => 'retail',
+            'e-commerce' => 'retail',
+            'ecommerce' => 'retail',
+            'manufacturing' => 'manufacturing',
+            'production' => 'manufacturing',
+            'customer support' => 'operations',
+            'support' => 'operations',
+        ];
+
+        foreach ($aliases as $needle => $category) {
+            if ($dept === $needle || str_contains($dept, $needle)) {
+                return $category;
+            }
+        }
+
+        return $this->resolveCategoryFromText($department);
     }
 
     /**

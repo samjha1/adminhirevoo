@@ -14,4 +14,7 @@ return [
 
     /** Seconds to cache resolved job sector category. */
     'job_sector_cache_ttl' => max(60, (int) env('HIREVO_JOB_SECTOR_CACHE_TTL', 3600)),
+
+    /** Seconds to cache match-sorted relevant candidate ID lists per job. */
+    'job_relevant_sort_cache_ttl' => max(60, (int) env('HIREVO_JOB_RELEVANT_SORT_CACHE_TTL', 300)),
 ];

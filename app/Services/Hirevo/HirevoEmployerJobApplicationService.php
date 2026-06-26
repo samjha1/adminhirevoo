@@ -54,8 +54,8 @@ class HirevoEmployerJobApplicationService
      */
     public function applyOnBehalf(HirevoEmployerJob $job, int $candidateId, Admin $admin): array
     {
-        if ($job->status !== 'active') {
-            return ['status' => 'skipped', 'reason' => 'Job is not active.'];
+        if ($job->status !== 'active' && $job->status !== 'draft') {
+            return ['status' => 'skipped', 'reason' => 'Job is closed and not accepting applications.'];
         }
 
         $candidate = HirevoUser::query()
