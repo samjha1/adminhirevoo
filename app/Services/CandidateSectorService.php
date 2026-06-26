@@ -3,15 +3,19 @@
 namespace App\Services;
 
 use App\Models\Hirevo\HirevoCandidateProfile;
+use App\Models\Hirevo\HirevoEmployerJob;
 use App\Models\Hirevo\HirevoLead;
 use App\Models\Hirevo\HirevoUser;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class CandidateSectorService
 {
+    private const SECTOR_INDEX_CACHE_KEY = 'portal.candidate_sector_index_v1';
+
     /** @var array<string, array{label: string, short: string, role_sectors: list<string>, keywords?: list<string>}>|null */
     private ?array $catalog = null;
 
@@ -150,6 +154,172 @@ class CandidateSectorService
             $lead->jobRole?->sector,
             $lead->jobRole?->title,
         );
+    }
+
+    public function resolveForJob(HirevoEmployerJob $job): ?string
+    {
+        if (! $this->sectorFeaturesAvailable()) {
+            return null;
+        }
+
+        $textBlob = $this->jobTextBlob($job);
+        $title = trim((string) ($job->title ?? ''));
+
+        return $this->resolveFromSignals(
+            $textBlob,
+            null,
+            $title !== '' ? $title : null,
+        );
+    }
+
+    /**
+     * Candidate user IDs for a sector category, excluding already-applied users.
+     *
+     * @param  list<int>  $excludeUserIds
+     * @return list<int>
+     */
+    public function candidateIdsForCategory(?string $categoryKey, array $excludeUserIds = []): array
+    {
+        return $this->candidateIdsForCategoryCached($categoryKey, $excludeUserIds);
+    }
+
+    /**
+     * @param  list<int>  $excludeUserIds
+     * @return list<int>
+     */
+    public function candidateIdsForCategoryCached(?string $categoryKey, array $excludeUserIds = []): array
+    {
+        if (! $this->sectorFeaturesAvailable()) {
+            return $this->allCandidateIdsDirect($excludeUserIds);
+        }
+
+        $key = ($categoryKey === null || $categoryKey === '' || $categoryKey === 'all')
+            ? 'uncategorized'
+            : $categoryKey;
+
+        $ids = $this->sectorIndex()[$key] ?? [];
+
+        return $this->excludeIds($ids, $excludeUserIds);
+    }
+
+    /**
+     * All candidate IDs (any sector), excluding given user IDs.
+     *
+     * @param  list<int>  $excludeUserIds
+     * @return list<int>
+     */
+    public function allCandidateIds(array $excludeUserIds = []): array
+    {
+        return $this->allCandidateIdsCached($excludeUserIds);
+    }
+
+    /**
+     * @param  list<int>  $excludeUserIds
+     * @return list<int>
+     */
+    public function allCandidateIdsCached(array $excludeUserIds = []): array
+    {
+        if (! $this->sectorFeaturesAvailable()) {
+            return $this->allCandidateIdsDirect($excludeUserIds);
+        }
+
+        $merged = [];
+        foreach ($this->sectorIndex() as $ids) {
+            foreach ($ids as $id) {
+                $merged[$id] = $id;
+            }
+        }
+
+        $all = array_values($merged);
+        rsort($all);
+
+        return $this->excludeIds($all, $excludeUserIds);
+    }
+
+    public function forgetSectorIndexCache(): void
+    {
+        Cache::forget(self::SECTOR_INDEX_CACHE_KEY);
+    }
+
+    /** @return array<string, list<int>> */
+    public function sectorIndex(): array
+    {
+        return Cache::remember(
+            self::SECTOR_INDEX_CACHE_KEY,
+            (int) config('hirevo_portal.candidate_sector_index_ttl', 1800),
+            fn () => $this->buildSectorIndex(),
+        );
+    }
+
+    /** @return array<string, list<int>> */
+    private function buildSectorIndex(): array
+    {
+        $keys = array_merge(array_keys($this->catalog()), ['uncategorized', 'other']);
+        $index = array_fill_keys($keys, []);
+
+        $baseQuery = HirevoUser::query()->where('role', 'candidate');
+
+        foreach ($this->loadCandidatesForResolution($baseQuery) as $candidate) {
+            $resolved = $this->resolveForCandidate($candidate) ?? 'uncategorized';
+            if (! array_key_exists($resolved, $index)) {
+                $resolved = 'other';
+            }
+            $index[$resolved][] = (int) $candidate->id;
+        }
+
+        foreach ($index as &$ids) {
+            rsort($ids);
+        }
+        unset($ids);
+
+        return $index;
+    }
+
+    /**
+     * @param  list<int>  $ids
+     * @param  list<int>  $excludeUserIds
+     * @return list<int>
+     */
+    private function excludeIds(array $ids, array $excludeUserIds): array
+    {
+        if ($excludeUserIds === []) {
+            return $ids;
+        }
+
+        $exclude = array_flip($excludeUserIds);
+
+        return array_values(array_filter($ids, fn (int $id) => ! isset($exclude[$id])));
+    }
+
+    /**
+     * @param  list<int>  $excludeUserIds
+     * @return list<int>
+     */
+    private function allCandidateIdsDirect(array $excludeUserIds = []): array
+    {
+        $query = HirevoUser::query()
+            ->where('role', 'candidate');
+
+        if ($excludeUserIds !== []) {
+            $query->whereNotIn('id', $excludeUserIds);
+        }
+
+        return $query->pluck('id')->map(fn ($id) => (int) $id)->all();
+    }
+
+    private function jobTextBlob(HirevoEmployerJob $job): string
+    {
+        $parts = array_filter([
+            $job->title,
+            $job->job_department,
+            $job->description,
+            $job->requirements,
+            is_array($job->required_skills)
+                ? implode(' ', $job->required_skills)
+                : (is_string($job->required_skills ?? null) ? $job->required_skills : null),
+        ], fn ($v) => is_string($v) && trim($v) !== '');
+
+        return implode(' ', $parts);
     }
 
     /**

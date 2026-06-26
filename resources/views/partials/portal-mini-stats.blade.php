@@ -11,7 +11,7 @@
                     </div>
                     <div>
                         <div class="portal-stat-label">{{ $item['label'] }}</div>
-                        <div class="portal-stat-value" style="font-size:1.35rem;">{{ number_format($item['value'] ?? 0) }}</div>
+                        <div class="portal-stat-value" style="font-size:1.35rem;">{{ is_numeric($item['value'] ?? null) ? number_format((float) $item['value']) : ($item['value'] ?? '—') }}</div>
                         @if(!empty($item['hint']))
                             <div class="portal-stat-delta neutral">{{ $item['hint'] }}</div>
                         @endif

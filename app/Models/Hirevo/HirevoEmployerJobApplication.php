@@ -20,5 +20,10 @@ class HirevoEmployerJobApplication extends Model
     {
         return $this->belongsTo(HirevoEmployerJob::class, 'employer_job_id');
     }
+
+    public function resume(): BelongsTo
+    {
+        return $this->belongsTo(HirevoResume::class, 'resume_id');
+    }
 }
 

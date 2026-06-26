@@ -119,7 +119,9 @@
                     @forelse($jobs as $job)
                         <tr>
                             <td>
-                                <div class="fw-semibold">{{ $job->title }}</div>
+                                <a href="{{ route('admin.jobs.show', $job->id) }}" class="fw-semibold text-decoration-none">
+                                    {{ $job->title }}
+                                </a>
                                 @if($job->job_type)
                                     <div class="small text-muted">{{ ucwords(str_replace('_', ' ', $job->job_type)) }}</div>
                                 @endif
@@ -131,6 +133,9 @@
                             <td><strong>{{ $job->displayApplicationsCount() }}</strong></td>
                             <td class="text-muted small">{{ $job->created_at?->format('M j, Y') }}</td>
                             <td class="text-end">
+                                <a href="{{ route('admin.jobs.show', $job->id) }}" class="btn btn-sm btn-outline-primary me-1" style="border-radius:8px;" title="View candidates">
+                                    <i class="bi bi-people"></i>
+                                </a>
                                 @if(auth('admin')->user()->canPermission('portal.jobs.edit') || auth('admin')->user()->canPermission('platform.jobs'))
                                     <form method="POST" action="{{ route('admin.jobs.status', $job->id) }}" class="d-inline-flex gap-1 align-items-center">
                                         @csrf

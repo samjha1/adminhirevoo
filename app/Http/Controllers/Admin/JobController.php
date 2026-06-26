@@ -5,11 +5,16 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Hirevo\HirevoEmployerJob;
 use App\Services\AuditLogService;
+use App\Services\CandidateSectorService;
+use App\Services\Hirevo\HirevoEmployerJobApplicationService;
 use App\Services\Hirevo\HirevoEmployerJobImportService;
+use App\Services\Hirevo\JobRelevantCandidatesService;
 use App\Support\PortalDateFilter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Route;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -18,6 +23,9 @@ class JobController extends Controller
 {
     public function __construct(
         private readonly AuditLogService $audit,
+        private readonly CandidateSectorService $sectors,
+        private readonly HirevoEmployerJobApplicationService $applicationService,
+        private readonly JobRelevantCandidatesService $relevantCandidates,
     ) {
     }
 
@@ -73,6 +81,116 @@ class JobController extends Controller
             'sort' => $sort,
             'direction' => $direction,
         ]);
+    }
+
+    public function show(Request $request, HirevoEmployerJob $job): View
+    {
+        $job->load(['employer.referrerProfile']);
+        $tab = $request->query('tab', 'relevant');
+        if (! in_array($tab, ['applicants', 'relevant'], true)) {
+            $tab = 'relevant';
+        }
+
+        $showAll = $request->boolean('show_all');
+        $appliedUserIds = $this->relevantCandidates->appliedUserIds($job);
+        $jobCategory = $this->relevantCandidates->resolveJobCategory($job);
+        $candidateIds = $this->relevantCandidates->relevantCandidateIds($jobCategory, $appliedUserIds, $showAll);
+
+        if ($tab === 'applicants') {
+            $applications = $this->relevantCandidates->paginateApplicants($request, $job);
+            $relevantCandidates = new LengthAwarePaginator(
+                collect(),
+                count($candidateIds),
+                20,
+                max(1, (int) $request->query('candidates_page', 1)),
+                ['path' => $request->url(), 'pageName' => 'candidates_page', 'query' => $request->query()],
+            );
+        } else {
+            $applications = new LengthAwarePaginator(
+                collect(),
+                count($appliedUserIds),
+                15,
+                max(1, (int) $request->query('applicants_page', 1)),
+                ['path' => $request->url(), 'pageName' => 'applicants_page', 'query' => $request->query()],
+            );
+            $relevantCandidates = $this->relevantCandidates->paginateRelevant($request, $job, $candidateIds);
+        }
+
+        $canApply = auth('admin')->user()->canPermission('portal.applications.create');
+
+        $appShowRoute = Route::has('admin.portal.applications.show') && ! auth('admin')->user()->canPermission('leads.view')
+            ? 'admin.portal.applications.show'
+            : 'admin.applications.show';
+        $appStatusRoute = $appShowRoute === 'admin.portal.applications.show'
+            ? 'admin.portal.applications.status'
+            : 'admin.applications.status';
+
+        return view('admin.jobs.show', [
+            'job' => $job,
+            'tab' => $tab,
+            'jobCategory' => $jobCategory,
+            'jobCategoryLabel' => $this->sectors->labelForCategory($jobCategory),
+            'showAll' => $showAll,
+            'applications' => $applications,
+            'relevantCandidates' => $relevantCandidates,
+            'applicantCount' => count($appliedUserIds),
+            'relevantCount' => count($candidateIds),
+            'canApply' => $canApply,
+            'appShowRoute' => $appShowRoute,
+            'appStatusRoute' => $appStatusRoute,
+        ]);
+    }
+
+    public function apply(Request $request, HirevoEmployerJob $job): RedirectResponse
+    {
+        $validated = $request->validate([
+            'candidate_ids' => ['required', 'array', 'min:1'],
+            'candidate_ids.*' => ['integer', 'min:1'],
+        ]);
+
+        $admin = auth('admin')->user();
+        $result = $this->applicationService->applyManyOnBehalf(
+            $job,
+            $validated['candidate_ids'],
+            $admin,
+        );
+
+        if (count($result['applied']) > 0) {
+            $this->relevantCandidates->invalidateJobCache($job->id);
+        }
+
+        $applied = count($result['applied']);
+        $skipped = count($result['skipped']);
+        $failed = count($result['failed']);
+
+        if ($applied > 0 && $skipped === 0 && $failed === 0) {
+            $message = $applied === 1
+                ? '1 candidate applied successfully.'
+                : "{$applied} candidates applied successfully.";
+            return redirect()
+                ->route('admin.jobs.show', ['job' => $job->id, 'tab' => 'applicants'])
+                ->with('success', $message);
+        }
+
+        $parts = [];
+        if ($applied > 0) {
+            $parts[] = "{$applied} applied";
+        }
+        if ($skipped > 0) {
+            $skipReasons = collect($result['skipped'])->take(3)->pluck('reason')->implode('; ');
+            $parts[] = "{$skipped} skipped ({$skipReasons})";
+        }
+        if ($failed > 0) {
+            $failReasons = collect($result['failed'])->take(3)->pluck('reason')->implode('; ');
+            $parts[] = "{$failed} failed ({$failReasons})";
+        }
+
+        $flashType = $applied > 0 ? 'warning' : 'error';
+        $message = implode('. ', $parts).'.';
+
+        return redirect()
+            ->route('admin.jobs.show', ['job' => $job->id, 'tab' => $applied > 0 ? 'applicants' : 'relevant'])
+            ->with($flashType, $message);
     }
 
     public function updateStatus(Request $request, HirevoEmployerJob $job): RedirectResponse

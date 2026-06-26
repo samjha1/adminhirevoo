@@ -56,6 +56,7 @@ final class PermissionCatalog
             ['slug' => 'portal.candidates.view', 'group' => 'portal', 'name' => 'View candidates'],
             ['slug' => 'portal.candidates.profile', 'group' => 'portal', 'name' => 'View candidate profile'],
             ['slug' => 'portal.applications.view', 'group' => 'portal', 'name' => 'View applications'],
+            ['slug' => 'portal.applications.create', 'group' => 'portal', 'name' => 'Apply on behalf of candidate'],
             ['slug' => 'portal.applications.update_status', 'group' => 'portal', 'name' => 'Update application status'],
             ['slug' => 'portal.reports.view', 'group' => 'portal', 'name' => 'View reports'],
             ['slug' => 'portal.reports.export', 'group' => 'portal', 'name' => 'Export reports'],
@@ -81,7 +82,7 @@ final class PermissionCatalog
             'portal.companies.view', 'portal.companies.edit',
             'portal.jobs.view', 'portal.jobs.edit',
             'portal.candidates.view', 'portal.candidates.profile',
-            'portal.applications.view', 'portal.applications.update_status',
+            'portal.applications.view', 'portal.applications.create', 'portal.applications.update_status',
             'portal.reports.view', 'portal.reports.export',
             'portal.users.view', 'portal.users.edit',
             'platform.users', 'platform.employers', 'platform.jobs', 'applications.view',
@@ -92,7 +93,7 @@ final class PermissionCatalog
             'portal.companies.view',
             'portal.jobs.view', 'portal.jobs.edit',
             'portal.candidates.view', 'portal.candidates.profile',
-            'portal.applications.view', 'portal.applications.update_status',
+            'portal.applications.view', 'portal.applications.create', 'portal.applications.update_status',
         ];
 
         return [

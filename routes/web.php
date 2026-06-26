@@ -321,6 +321,12 @@ Route::middleware(['admin.guard', 'auth:admin', 'role:admin|super_admin|recruite
     Route::get('/jobs/import/sample', [JobController::class, 'downloadSample'])
         ->middleware('permission:platform.jobs|portal.jobs.create')
         ->name('admin.jobs.import.sample');
+    Route::get('/jobs/{job}', [JobController::class, 'show'])
+        ->middleware('permission:platform.jobs|portal.jobs.view')
+        ->name('admin.jobs.show');
+    Route::post('/jobs/{job}/apply', [JobController::class, 'apply'])
+        ->middleware('permission:portal.applications.create')
+        ->name('admin.jobs.apply');
     Route::post('/jobs/{job}/status', [JobController::class, 'updateStatus'])
         ->middleware('permission:platform.jobs|portal.jobs.edit')
         ->name('admin.jobs.status');
