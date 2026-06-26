@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\Leads\LeadCallController;
 use App\Http\Controllers\Admin\Leads\LeadController;
 use App\Http\Controllers\Admin\Leads\LeadFollowUpController;
 use App\Http\Controllers\Admin\Leads\CompanyFollowUpController;
+use App\Http\Controllers\Admin\Leads\CompanyOutreachLeadController;
 use App\Http\Controllers\Admin\Leads\EmployerPipelineController;
 use App\Http\Controllers\Admin\Leads\LeadKanbanController;
 use App\Http\Controllers\Admin\Leads\StandaloneLeadController;
@@ -47,6 +48,9 @@ Route::middleware('guest:admin')->group(function () {
 Route::post('/logout', [\App\Http\Controllers\Auth\AdminAuthController::class, 'destroy'])
     ->middleware('auth:admin')
     ->name('admin.logout');
+Route::get('/logout', [\App\Http\Controllers\Auth\AdminAuthController::class, 'destroy'])
+    ->middleware('auth:admin')
+    ->name('admin.logout.get');
 
 Route::middleware(['admin.guard', 'auth:admin', 'permission:analytics.view'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
@@ -128,6 +132,37 @@ Route::middleware(['admin.guard', 'auth:admin', 'permission:leads.view', 'sales.
 });
 
 Route::middleware(['admin.guard', 'auth:admin', 'permission:leads.view', 'sales.pipeline:employer'])->group(function () {
+    Route::get('/pipelines/companies/outreach', [CompanyOutreachLeadController::class, 'index'])->name('admin.employers.outreach.index');
+    Route::get('/pipelines/companies/outreach/import', [CompanyOutreachLeadController::class, 'importForm'])
+        ->middleware('permission:leads.import')
+        ->name('admin.employers.outreach.import');
+    Route::post('/pipelines/companies/outreach/import', [CompanyOutreachLeadController::class, 'import'])
+        ->middleware(['permission:leads.import', 'throttle:10,1'])
+        ->name('admin.employers.outreach.import.store');
+    Route::get('/pipelines/companies/outreach/template', [CompanyOutreachLeadController::class, 'template'])
+        ->middleware('permission:leads.import')
+        ->name('admin.employers.outreach.template');
+    Route::post('/pipelines/companies/outreach/bulk/assign-team-lead', [CompanyOutreachLeadController::class, 'bulkAssignTeamLeads'])
+        ->middleware(['permission:leads.assign_manager|leads.assign_employee', 'throttle:30,1'])
+        ->name('admin.employers.outreach.bulk-assign-team-lead');
+    Route::post('/pipelines/companies/outreach/bulk/assign-employee', [CompanyOutreachLeadController::class, 'bulkAssignEmployees'])
+        ->middleware(['permission:leads.assign_employee', 'throttle:30,1'])
+        ->name('admin.employers.outreach.bulk-assign-employee');
+    Route::get('/pipelines/companies/outreach/{outreachLead}', [CompanyOutreachLeadController::class, 'show'])
+        ->whereNumber('outreachLead')
+        ->name('admin.employers.outreach.show');
+    Route::post('/pipelines/companies/outreach/{outreachLead}/stage', [CompanyOutreachLeadController::class, 'updateStage'])
+        ->whereNumber('outreachLead')
+        ->middleware('permission:leads.update_stage')
+        ->name('admin.employers.outreach.stage');
+    Route::post('/pipelines/companies/outreach/{outreachLead}/assign-team-lead', [CompanyOutreachLeadController::class, 'assignTeamLead'])
+        ->whereNumber('outreachLead')
+        ->middleware('permission:leads.assign_manager|leads.assign_employee')
+        ->name('admin.employers.outreach.assign-team-lead');
+    Route::post('/pipelines/companies/outreach/{outreachLead}/assign-employee', [CompanyOutreachLeadController::class, 'assignEmployee'])
+        ->whereNumber('outreachLead')
+        ->middleware('permission:leads.assign_employee')
+        ->name('admin.employers.outreach.assign-employee');
     Route::get('/pipelines/companies', [EmployerPipelineController::class, 'index'])->name('admin.employers.pipeline.index');
     Route::get('/pipelines/companies/kanban', [EmployerPipelineController::class, 'kanban'])
         ->middleware('permission:kanban.view')
@@ -152,7 +187,7 @@ Route::middleware(['admin.guard', 'auth:admin', 'permission:leads.view', 'sales.
         ->middleware('permission:leads.manage_followups')
         ->name('admin.companies.follow-ups.today');
     Route::post('/pipelines/companies/bulk/assign-manager', [EmployerPipelineController::class, 'bulkAssignManagers'])
-        ->middleware(['permission:leads.assign_manager', 'throttle:30,1'])
+        ->middleware(['permission:leads.assign_manager|leads.assign_employee', 'throttle:30,1'])
         ->name('admin.employers.pipeline.bulk-assign-manager');
     Route::post('/pipelines/companies/bulk/assign-employee', [EmployerPipelineController::class, 'bulkAssignEmployees'])
         ->middleware(['permission:leads.assign_employee', 'throttle:30,1'])

@@ -20,7 +20,7 @@ class AdminAuthController extends Controller
         if (Auth::guard('admin')->attempt($credentials, $request->boolean('remember'))) {
             $request->session()->regenerate();
 
-            return redirect()->intended(AdminHomeResolver::urlFor(Auth::guard('admin')->user()));
+            return AdminHomeResolver::loginRedirect(Auth::guard('admin')->user(), $request);
         }
 
         return back()

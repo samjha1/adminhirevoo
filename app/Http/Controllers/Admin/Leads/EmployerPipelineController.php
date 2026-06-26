@@ -14,10 +14,10 @@ use App\Modules\Leads\Models\CrmFollowUp;
 use App\Modules\Leads\Services\CompanyB2bPipelineService;
 use App\Modules\Leads\Services\CompanyMeetingService;
 use App\Modules\Leads\Services\FollowUpService;
+use App\Services\CompanySalesAssignmentSupport;
 use App\Services\EmployerProspectAssignmentService;
 use App\Services\EmployerProspectSyncService;
 use App\Services\EmployerProspectVisibilityService;
-use App\Services\SalesTeamService;
 use App\Support\PortalDateFilter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -32,7 +32,7 @@ class EmployerPipelineController extends Controller
         private readonly EmployerProspectAssignmentService $assignment,
         private readonly EmployerProspectSyncService $sync,
         private readonly CompanyB2bPipelineService $b2bPipeline,
-        private readonly SalesTeamService $teams,
+        private readonly CompanySalesAssignmentSupport $assignmentSupport,
     ) {
     }
 
@@ -214,9 +214,9 @@ class EmployerPipelineController extends Controller
             'employee_id' => ['required', 'exists:admins,id'],
         ]);
 
-        $manager = $request->user('admin');
+        $actor = $request->user('admin');
         $employee = Admin::query()->findOrFail((int) $validated['employee_id']);
-        $result = $this->assignment->bulkAssignToEmployees($validated['prospect_ids'], $employee, $manager);
+        $result = $this->assignment->bulkAssignToEmployees($validated['prospect_ids'], $employee, $actor);
 
         return $this->bulkRedirect($result, 'company team executive');
     }
@@ -253,17 +253,14 @@ class EmployerPipelineController extends Controller
             'prospects' => $prospects,
             'dateFilter' => $dateFilter,
             'pipeline' => SalesTeam::Employer,
-            'assignableManagers' => $this->assignableManagers(),
-            'assignableEmployees' => $this->assignableEmployees($admin),
-            'canBulkManagers' => $admin->canPermission('leads.assign_manager'),
-            'canBulkEmployees' => (
-                $admin->canPermission('leads.assign_employee')
-                && $admin->role === AdminRole::SalesManager
-                && $this->teams->teamFor($admin) === SalesTeam::Employer
-            ),
+            'assignableManagers' => $this->assignmentSupport->assignableManagers($admin),
+            'assignableEmployees' => $this->assignmentSupport->assignableEmployees($admin),
+            'canBulkManagers' => $this->assignmentSupport->canAssignManagers($admin),
+            'canBulkEmployees' => $this->assignmentSupport->canAssignEmployees($admin),
             'stageLabels' => $stageLabels,
             'stageCounts' => $stageCounts,
             'pipelineStages' => CompanyB2bPipelineStage::ordered(),
+            'isAsmActor' => $admin->role === AdminRole::Asm,
         ];
     }
 
@@ -280,27 +277,6 @@ class EmployerPipelineController extends Controller
             ->pluck('aggregate', 'pipeline_stage')
             ->map(fn ($v) => (int) $v)
             ->all();
-    }
-
-    /** @return \Illuminate\Database\Eloquent\Collection<int, Admin> */
-    private function assignableManagers(): \Illuminate\Database\Eloquent\Collection
-    {
-        return Admin::query()
-            ->where('role', AdminRole::SalesManager)
-            ->where('sales_team', SalesTeam::Employer->value)
-            ->orderBy('name')
-            ->get();
-    }
-
-    /** @return \Illuminate\Database\Eloquent\Collection<int, Admin> */
-    private function assignableEmployees(Admin $admin): \Illuminate\Database\Eloquent\Collection
-    {
-        return Admin::query()
-            ->where('role', AdminRole::SalesEmployee)
-            ->where('sales_team', SalesTeam::Employer->value)
-            ->when($admin->role === AdminRole::SalesManager, fn ($q) => $q->where('manager_id', $admin->id))
-            ->orderBy('name')
-            ->get();
     }
 
     private function bulkRedirect(array $result, string $label): RedirectResponse

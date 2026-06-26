@@ -37,6 +37,14 @@
                         <span class="sidebar-link-sub">B2B pipeline</span>
                     </span>
                 </a>
+                <a class="sidebar-link sidebar-link--child @if(request()->routeIs('admin.employers.outreach.*')) is-active @endif"
+                   href="{{ route('admin.employers.outreach.index') }}">
+                    <span class="sidebar-link-icon"><i class="bi bi-person-plus"></i></span>
+                    <span class="sidebar-link-text">
+                        <span class="sidebar-link-label">Outreach leads</span>
+                        <span class="sidebar-link-sub">Not signed up</span>
+                    </span>
+                </a>
                 @if($can('kanban.view'))
                     <a class="sidebar-link sidebar-link--child @if(request()->routeIs('admin.employers.pipeline.kanban')) is-active @endif"
                        href="{{ route('admin.employers.pipeline.kanban') }}">

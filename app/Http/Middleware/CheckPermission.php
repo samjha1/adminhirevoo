@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Modules\Rbac\Services\PermissionResolver;
+use App\Support\AdminHomeResolver;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -39,8 +40,21 @@ class CheckPermission
             }
         }
 
-        return $request->expectsJson()
-            ? response()->json(['message' => 'Forbidden.'], 403)
-            : abort(403, 'You do not have permission to access this area.');
+        if ($request->expectsJson()) {
+            return response()->json(['message' => 'Forbidden.'], 403);
+        }
+
+        if ($request->isMethod('GET')) {
+            $home = AdminHomeResolver::urlFor($admin);
+
+            if ($request->fullUrl() !== $home) {
+                return redirect($home)->with(
+                    'error',
+                    'You do not have permission to access that area.',
+                );
+            }
+        }
+
+        abort(403, 'You do not have permission to access this area.');
     }
 }

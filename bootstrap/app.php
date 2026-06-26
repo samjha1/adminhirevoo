@@ -5,6 +5,8 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Session\TokenMismatchException;
+use Illuminate\Support\Facades\Auth;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -33,6 +35,24 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             return redirect()->back()->withInput()->with('error', $e->getMessage());
+        });
+
+        $exceptions->render(function (TokenMismatchException $e, Request $request) {
+            if ($request->routeIs('admin.logout')) {
+                Auth::guard('admin')->logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+
+                return redirect()->route('admin.login')
+                    ->with('info', 'Your session expired. Please sign in again.');
+            }
+
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json(['message' => 'Session expired. Please refresh and try again.'], 419);
+            }
+
+            return redirect()->route('admin.login')
+                ->with('error', 'Your session expired. Please sign in again.');
         });
 
         $exceptions->render(function (AuthorizationException $e, Request $request) {
