@@ -25,6 +25,8 @@ use App\Http\Controllers\Admin\Users\HirevoUserController;
 use App\Http\Controllers\Admin\ApplicationController;
 use App\Http\Controllers\Admin\Portal\CandidateController;
 use App\Http\Controllers\Admin\Portal\PortalDashboardController;
+use App\Http\Controllers\Admin\Portal\RecruiterActivityController;
+use App\Http\Controllers\Admin\Portal\RecruiterAssignmentController;
 use App\Http\Controllers\Admin\Portal\ReportController;
 use App\Modules\Leads\Services\HirevoLeadExportService;
 use App\Support\AdminHomeResolver;
@@ -283,9 +285,28 @@ Route::middleware(['admin.guard', 'auth:admin', 'permission:portal.applications.
     Route::post('/portal/applications/{application}/status', [ApplicationController::class, 'updateStatus'])
         ->middleware('permission:portal.applications.update_status')
         ->name('admin.portal.applications.status');
+
+    Route::get('/portal/my-activity', [RecruiterActivityController::class, 'myActivity'])
+        ->name('admin.portal.my-activity');
 });
 
-Route::middleware(['admin.guard', 'auth:admin', 'role:admin|super_admin|recruiter'])->group(function () {
+Route::middleware(['admin.guard', 'auth:admin', 'permission:portal.recruiter_assignments.manage'])->group(function () {
+    Route::get('/portal/recruiter-assignments', [RecruiterAssignmentController::class, 'index'])
+        ->name('admin.portal.recruiter-assignments.index');
+    Route::get('/portal/recruiter-assignments/{admin}/edit', [RecruiterAssignmentController::class, 'edit'])
+        ->name('admin.portal.recruiter-assignments.edit');
+    Route::post('/portal/recruiter-assignments/{admin}', [RecruiterAssignmentController::class, 'update'])
+        ->name('admin.portal.recruiter-assignments.update');
+    Route::delete('/portal/recruiter-assignments/{admin}/{employer}', [RecruiterAssignmentController::class, 'destroy'])
+        ->name('admin.portal.recruiter-assignments.destroy');
+});
+
+Route::middleware(['admin.guard', 'auth:admin', 'permission:portal.recruiter_activity.view'])->group(function () {
+    Route::get('/portal/recruiter-activity', [RecruiterActivityController::class, 'managerIndex'])
+        ->name('admin.portal.recruiter-activity.index');
+});
+
+Route::middleware(['admin.guard', 'auth:admin', 'role:admin|super_admin|recruiter|recruiter_manager'])->group(function () {
     Route::get('/users', [HirevoUserController::class, 'index'])
         ->middleware('permission:platform.users|portal.users.view')
         ->name('admin.users.index');

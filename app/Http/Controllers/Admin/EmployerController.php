@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Hirevo\HirevoEmployerJobApplication;
 use App\Models\Hirevo\HirevoUser;
 use App\Services\AuditLogService;
+use App\Services\Portal\PortalRecruiterScopeService;
 use App\Support\PortalDateFilter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,11 +16,13 @@ class EmployerController extends Controller
 {
     public function __construct(
         private readonly AuditLogService $audit,
+        private readonly PortalRecruiterScopeService $recruiterScope,
     ) {
     }
 
     public function index(Request $request): View
     {
+        $admin = auth('admin')->user();
         $dateFilter = PortalDateFilter::fromRequest($request);
         $sort = $request->query('sort', 'created_at');
         $direction = $request->query('dir', 'desc') === 'asc' ? 'asc' : 'desc';
@@ -32,6 +35,8 @@ class EmployerController extends Controller
                 'employerJobs as active_jobs_count' => fn ($q) => $q->where('status', 'active'),
             ])
             ->orderBy($sort, $direction);
+
+        $this->recruiterScope->scopeEmployersQuery($query, $admin);
 
         $query->addSelect([
             'applications_received_count' => HirevoEmployerJobApplication::query()
@@ -79,12 +84,15 @@ class EmployerController extends Controller
             'dateFilter' => $dateFilter,
             'sort' => $sort,
             'direction' => $direction,
+            'recruiterHasNoAssignments' => $this->recruiterScope->isRecruiter($admin)
+                && ! $this->recruiterScope->hasAssignments($admin),
         ]);
     }
 
     public function show(Request $request, HirevoUser $employer): View
     {
         abort_unless($employer->role === 'referrer', 404);
+        $this->recruiterScope->assertCanAccessEmployer(auth('admin')->user(), (int) $employer->id);
 
         $employer->load(['referrerProfile']);
 

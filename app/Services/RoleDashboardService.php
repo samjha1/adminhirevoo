@@ -38,7 +38,15 @@ class RoleDashboardService
             AdminRole::Asm, AdminRole::SalesManager => $this->salesManagerMetrics($admin, $period),
             AdminRole::SalesEmployee => $this->salesEmployeeMetrics($admin, $period),
             AdminRole::Recruiter => $this->recruiterMetrics(),
+            AdminRole::RecruiterManager => $this->recruiterManagerMetrics(),
         };
+    }
+
+    private function recruiterManagerMetrics(): array
+    {
+        return [
+            'role' => AdminRole::RecruiterManager,
+        ];
     }
 
     private function recruiterMetrics(): array

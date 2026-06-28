@@ -2,6 +2,7 @@
 
 namespace App\Models\Hirevo;
 
+use App\Models\Admin;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -24,6 +25,11 @@ class HirevoEmployerJobApplication extends Model
     public function resume(): BelongsTo
     {
         return $this->belongsTo(HirevoResume::class, 'resume_id');
+    }
+
+    public function appliedByAdmin(): BelongsTo
+    {
+        return $this->belongsTo(Admin::class, 'applied_by_admin_id');
     }
 }
 

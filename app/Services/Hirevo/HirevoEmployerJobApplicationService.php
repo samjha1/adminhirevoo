@@ -8,6 +8,7 @@ use App\Models\Hirevo\HirevoEmployerJobApplication;
 use App\Models\Hirevo\HirevoResume;
 use App\Models\Hirevo\HirevoUser;
 use App\Services\AuditLogService;
+use App\Services\Portal\PortalRecruiterScopeService;
 use Illuminate\Support\Facades\Schema;
 
 class HirevoEmployerJobApplicationService
@@ -18,6 +19,7 @@ class HirevoEmployerJobApplicationService
     public function __construct(
         private readonly JobMatchScoreService $matchScore,
         private readonly AuditLogService $audit,
+        private readonly PortalRecruiterScopeService $recruiterScope,
     ) {
     }
 
@@ -54,6 +56,8 @@ class HirevoEmployerJobApplicationService
      */
     public function applyOnBehalf(HirevoEmployerJob $job, int $candidateId, Admin $admin): array
     {
+        $this->recruiterScope->assertCanAccessJob($admin, $job);
+
         if ($job->status !== 'active' && $job->status !== 'draft') {
             return ['status' => 'skipped', 'reason' => 'Job is closed and not accepting applications.'];
         }

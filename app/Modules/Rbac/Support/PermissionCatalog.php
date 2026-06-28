@@ -58,6 +58,8 @@ final class PermissionCatalog
             ['slug' => 'portal.applications.view', 'group' => 'portal', 'name' => 'View applications'],
             ['slug' => 'portal.applications.create', 'group' => 'portal', 'name' => 'Apply on behalf of candidate'],
             ['slug' => 'portal.applications.update_status', 'group' => 'portal', 'name' => 'Update application status'],
+            ['slug' => 'portal.recruiter_assignments.manage', 'group' => 'portal', 'name' => 'Manage recruiter company assignments'],
+            ['slug' => 'portal.recruiter_activity.view', 'group' => 'portal', 'name' => 'View recruiter apply activity'],
             ['slug' => 'portal.reports.view', 'group' => 'portal', 'name' => 'View reports'],
             ['slug' => 'portal.reports.export', 'group' => 'portal', 'name' => 'Export reports'],
             ['slug' => 'portal.users.view', 'group' => 'portal', 'name' => 'View portal users'],
@@ -83,6 +85,7 @@ final class PermissionCatalog
             'portal.jobs.view', 'portal.jobs.edit',
             'portal.candidates.view', 'portal.candidates.profile',
             'portal.applications.view', 'portal.applications.create', 'portal.applications.update_status',
+            'portal.recruiter_assignments.manage', 'portal.recruiter_activity.view',
             'portal.reports.view', 'portal.reports.export',
             'portal.users.view', 'portal.users.edit',
             'platform.users', 'platform.employers', 'platform.jobs', 'applications.view',
@@ -96,6 +99,15 @@ final class PermissionCatalog
             'portal.applications.view', 'portal.applications.create', 'portal.applications.update_status',
         ];
 
+        $recruiterManager = [
+            'portal.recruiter_assignments.manage',
+            'portal.recruiter_activity.view',
+            'portal.companies.view',
+            'portal.jobs.view',
+            'portal.applications.view',
+            'portal.candidates.profile',
+        ];
+
         return [
             'super_admin' => $all,
             'admin' => array_values(array_unique(array_merge(
@@ -103,6 +115,7 @@ final class PermissionCatalog
                 $portalAdmin,
             ))),
             'recruiter' => $recruiter,
+            'recruiter_manager' => $recruiterManager,
             'marketing' => [
                 'leads.view', 'leads.view_all', 'leads.create', 'leads.import', 'leads.export',
                 'leads.assign_manager', 'leads.reassign', 'leads.release', 'consultations.view',
@@ -140,6 +153,7 @@ final class PermissionCatalog
             'sales_manager' => 'sales_manager',
             'sales_employee' => 'sales_employee',
             'recruiter' => 'recruiter',
+            'recruiter_manager' => 'recruiter_manager',
         ];
     }
 }

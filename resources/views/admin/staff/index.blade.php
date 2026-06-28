@@ -31,6 +31,7 @@
             \App\Enums\AdminRole::SalesManager => 'staff-badge staff-badge--manager',
             \App\Enums\AdminRole::SalesEmployee => 'staff-badge staff-badge--employee',
             \App\Enums\AdminRole::Recruiter => 'staff-badge staff-badge--recruiter',
+            \App\Enums\AdminRole::RecruiterManager => 'staff-badge staff-badge--recruiter-manager',
         };
     @endphp
 
@@ -110,6 +111,7 @@
         .staff-badge--manager { background: #eef2ff; color: #4338ca; }
         .staff-badge--employee { background: #ecfdf5; color: #047857; }
         .staff-badge--recruiter { background: #f0fdf4; color: #15803d; }
+        .staff-badge--recruiter-manager { background: #ecfeff; color: #0e7490; }
         .staff-tag {
             display: inline-flex;
             align-items: center;

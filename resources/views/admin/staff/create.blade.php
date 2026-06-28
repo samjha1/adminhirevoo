@@ -12,6 +12,7 @@
                     New login for your {{ ($lockedTeam ?? null)?->shortLabel() ?? 'sales' }} team.
                 @else
                     Assign role and sales team so the user sees the correct pipeline.
+                    <strong>Recruiter Manager</strong> can assign companies to recruiters without CRM access.
                 @endif
             </div>
         </div>

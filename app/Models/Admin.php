@@ -96,6 +96,11 @@ class Admin extends Authenticatable
         return $this->hasMany(CrmAdminPermissionOverride::class);
     }
 
+    public function recruiterCompanyAssignments(): HasMany
+    {
+        return $this->hasMany(PortalRecruiterCompanyAssignment::class, 'admin_id');
+    }
+
     public function hasRole(AdminRole|string $role): bool
     {
         $r = $role instanceof AdminRole ? $role->value : $role;

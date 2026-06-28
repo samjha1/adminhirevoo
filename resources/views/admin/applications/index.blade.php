@@ -128,6 +128,7 @@
                         <th>Contact</th>
                         <th>Match</th>
                         <th>Status</th>
+                        <th>Applied by</th>
                         <th>Applied</th>
                     </tr>
                     </thead>
@@ -173,11 +174,19 @@
                                     <button type="submit" class="btn btn-sm btn-outline-primary" style="border-radius:8px;">Save</button>
                                 </form>
                             </td>
+                            <td class="small">
+                                @if($application->applied_by_admin_id && $application->appliedByAdmin)
+                                    <span class="fw-medium">{{ $application->appliedByAdmin->name }}</span>
+                                    <span class="badge rounded-pill bg-info-subtle text-info-emphasis ms-1">Recruiter</span>
+                                @else
+                                    <span class="text-muted">Candidate</span>
+                                @endif
+                            </td>
                             <td class="text-muted small">{{ $application->created_at?->format('M j, Y') }}</td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7">
+                            <td colspan="8">
                                 <div class="portal-empty">
                                     <i class="bi bi-inbox"></i>
                                     No applications match your filters.

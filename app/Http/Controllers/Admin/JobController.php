@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Hirevo\HirevoEmployerJob;
+use App\Models\Hirevo\HirevoUser;
 use App\Services\AuditLogService;
 use App\Services\CandidateSectorService;
 use App\Services\Hirevo\HirevoEmployerJobApplicationService;
 use App\Services\Hirevo\HirevoEmployerJobImportService;
 use App\Services\Hirevo\JobRelevantCandidatesService;
+use App\Services\Portal\PortalRecruiterScopeService;
 use App\Support\PortalApplyPermission;
 use App\Support\PortalDateFilter;
 use Illuminate\Http\RedirectResponse;
@@ -28,11 +30,13 @@ class JobController extends Controller
         private readonly CandidateSectorService $sectors,
         private readonly HirevoEmployerJobApplicationService $applicationService,
         private readonly JobRelevantCandidatesService $relevantCandidates,
+        private readonly PortalRecruiterScopeService $recruiterScope,
     ) {
     }
 
     public function index(Request $request): View
     {
+        $admin = auth('admin')->user();
         $dateFilter = PortalDateFilter::fromRequest($request);
         $sort = $request->query('sort', 'created_at');
         $direction = $request->query('dir', 'desc') === 'asc' ? 'asc' : 'desc';
@@ -42,7 +46,12 @@ class JobController extends Controller
             ->withCount('applications')
             ->orderBy($sort, $direction);
 
+        $this->recruiterScope->scopeJobsQuery($query, $admin);
         $dateFilter->apply($query);
+
+        if ($request->filled('company_id')) {
+            $query->where('user_id', (int) $request->query('company_id'));
+        }
 
         if ($request->filled('status')) {
             $status = $request->string('status')->toString();
@@ -68,13 +77,26 @@ class JobController extends Controller
         }
 
         $today = now()->startOfDay();
+        $statsQuery = fn () => $this->recruiterScope->scopeJobsQuery(HirevoEmployerJob::query(), $admin);
         $stats = [
-            'total' => HirevoEmployerJob::query()->count(),
-            'active' => HirevoEmployerJob::query()->where('status', 'active')->count(),
-            'expired' => HirevoEmployerJob::query()->where('status', 'closed')->count(),
-            'draft' => HirevoEmployerJob::query()->where('status', 'draft')->count(),
-            'today' => HirevoEmployerJob::query()->where('created_at', '>=', $today)->count(),
+            'total' => (clone $statsQuery())->count(),
+            'active' => (clone $statsQuery())->where('status', 'active')->count(),
+            'expired' => (clone $statsQuery())->where('status', 'closed')->count(),
+            'draft' => (clone $statsQuery())->where('status', 'draft')->count(),
+            'today' => (clone $statsQuery())->where('created_at', '>=', $today)->count(),
         ];
+
+        $filterCompanies = collect();
+        if ($this->recruiterScope->isRecruiter($admin) && ! $this->recruiterScope->isUnrestricted($admin)) {
+            $assignedIds = $this->recruiterScope->assignedEmployerIds($admin);
+            if ($assignedIds !== []) {
+                $filterCompanies = HirevoUser::query()
+                    ->whereIn('id', $assignedIds)
+                    ->with('referrerProfile')
+                    ->orderBy('name')
+                    ->get(['id', 'name']);
+            }
+        }
 
         return view('admin.jobs.index', [
             'jobs' => $query->paginate(20)->withQueryString(),
@@ -82,11 +104,15 @@ class JobController extends Controller
             'stats' => $stats,
             'sort' => $sort,
             'direction' => $direction,
+            'filterCompanies' => $filterCompanies,
+            'recruiterHasNoAssignments' => $this->recruiterScope->isRecruiter($admin)
+                && ! $this->recruiterScope->hasAssignments($admin),
         ]);
     }
 
     public function show(Request $request, HirevoEmployerJob $job): View
     {
+        $this->recruiterScope->assertCanAccessJob(auth('admin')->user(), $job);
         $job->load(['employer.referrerProfile']);
         $tab = $request->query('tab', 'relevant');
         if (! in_array($tab, ['applicants', 'relevant'], true)) {
@@ -150,6 +176,8 @@ class JobController extends Controller
 
     public function apply(Request $request, HirevoEmployerJob $job): RedirectResponse
     {
+        $this->recruiterScope->assertCanAccessJob(auth('admin')->user(), $job);
+
         $validated = $request->validate([
             'candidate_ids' => ['required', 'array', 'min:1'],
             'candidate_ids.*' => ['integer', 'min:1'],

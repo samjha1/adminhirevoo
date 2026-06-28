@@ -9,6 +9,7 @@
     $isCompanyTeam = $team === SalesTeam::Employer;
     $showCompany = $can('leads.view') && ($isMarketing || $isCompanyTeam);
     $showTalent = $can('leads.view') && ($isMarketing || ! $isCompanyTeam);
+    $isRecruiter = $admin->role === \App\Enums\AdminRole::Recruiter;
 @endphp
 <nav class="sidebar-nav" aria-label="Main navigation">
     @if($can('analytics.view'))
@@ -18,6 +19,15 @@
             <span class="sidebar-link-text">
                 <span class="sidebar-link-label">Home</span>
                 <span class="sidebar-link-sub">Dashboard</span>
+            </span>
+        </a>
+    @elseif($can('portal.recruiter_assignments.manage') || $can('portal.recruiter_activity.view'))
+        <a class="sidebar-link @if(request()->routeIs('admin.portal.recruiter-assignments.*', 'admin.portal.recruiter-activity.*')) is-active @endif"
+           href="{{ $homeUrl }}">
+            <span class="sidebar-link-icon"><i class="bi bi-grid-1x2"></i></span>
+            <span class="sidebar-link-text">
+                <span class="sidebar-link-label">Home</span>
+                <span class="sidebar-link-sub">Recruiter portal</span>
             </span>
         </a>
     @endif
@@ -171,7 +181,7 @@
         </div>
     @endif
 
-    @if($can('portal.dashboard.view') || $can('portal.jobs.view') || $can('portal.applications.view') || $can('portal.reports.view'))
+    @if($can('portal.dashboard.view') || $can('portal.jobs.view') || $can('portal.applications.view') || $can('portal.reports.view') || $can('portal.companies.view') || $can('portal.recruiter_assignments.manage') || $can('portal.recruiter_activity.view'))
         <div class="sidebar-group sidebar-group--portal">
             <div class="sidebar-group-label">
                 <i class="bi bi-briefcase"></i>
@@ -185,6 +195,15 @@
                         <span class="sidebar-link-text">
                             <span class="sidebar-link-label">Dashboard</span>
                             <span class="sidebar-link-sub">Platform analytics</span>
+                        </span>
+                    </a>
+                @endif
+                @if($can('portal.companies.view') || $can('platform.employers'))
+                    <a class="sidebar-link @if(request()->routeIs('admin.employers.*')) is-active @endif"
+                       href="{{ route('admin.employers.index') }}">
+                        <span class="sidebar-link-icon"><i class="bi bi-building"></i></span>
+                        <span class="sidebar-link-text">
+                            <span class="sidebar-link-label">{{ $isRecruiter ? 'My companies' : 'Companies' }}</span>
                         </span>
                     </a>
                 @endif
@@ -203,6 +222,33 @@
                         <span class="sidebar-link-icon"><i class="bi bi-file-earmark-person"></i></span>
                         <span class="sidebar-link-text">
                             <span class="sidebar-link-label">Applications</span>
+                        </span>
+                    </a>
+                @endif
+                @if($isRecruiter && $can('portal.applications.view'))
+                    <a class="sidebar-link @if(request()->routeIs('admin.portal.my-activity')) is-active @endif"
+                       href="{{ route('admin.portal.my-activity') }}">
+                        <span class="sidebar-link-icon"><i class="bi bi-clipboard-data"></i></span>
+                        <span class="sidebar-link-text">
+                            <span class="sidebar-link-label">My activity</span>
+                        </span>
+                    </a>
+                @endif
+                @if($can('portal.recruiter_assignments.manage'))
+                    <a class="sidebar-link @if(request()->routeIs('admin.portal.recruiter-assignments.*')) is-active @endif"
+                       href="{{ route('admin.portal.recruiter-assignments.index') }}">
+                        <span class="sidebar-link-icon"><i class="bi bi-building-gear"></i></span>
+                        <span class="sidebar-link-text">
+                            <span class="sidebar-link-label">Recruiter assignments</span>
+                        </span>
+                    </a>
+                @endif
+                @if($can('portal.recruiter_activity.view'))
+                    <a class="sidebar-link @if(request()->routeIs('admin.portal.recruiter-activity.*')) is-active @endif"
+                       href="{{ route('admin.portal.recruiter-activity.index') }}">
+                        <span class="sidebar-link-icon"><i class="bi bi-person-lines-fill"></i></span>
+                        <span class="sidebar-link-text">
+                            <span class="sidebar-link-label">Recruiter activity</span>
                         </span>
                     </a>
                 @endif

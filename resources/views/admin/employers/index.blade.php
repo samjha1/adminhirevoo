@@ -23,6 +23,13 @@
 
     @include('partials.portal-date-filter', ['dateFilter' => $dateFilter ?? null])
 
+    @if(!empty($recruiterHasNoAssignments))
+        <div class="alert alert-info shadow-soft">
+            <i class="bi bi-info-circle me-1"></i>
+            No companies assigned yet. Ask your manager to assign employer companies.
+        </div>
+    @endif
+
     <div class="card shadow-soft">
         <div class="table-responsive">
             <table class="table align-middle mb-0">
@@ -68,7 +75,13 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="8" class="text-center text-muted py-4">No companies found.</td></tr>
+                    <tr><td colspan="8" class="text-center text-muted py-4">
+                        @if(!empty($recruiterHasNoAssignments))
+                            No companies assigned yet.
+                        @else
+                            No companies found.
+                        @endif
+                    </td></tr>
                 @endforelse
                 </tbody>
             </table>

@@ -72,6 +72,7 @@ class AdminStaffController extends Controller
                 AdminRole::Admin,
                 AdminRole::Marketing,
                 AdminRole::Recruiter,
+                AdminRole::RecruiterManager,
             ])->count(),
         ];
 

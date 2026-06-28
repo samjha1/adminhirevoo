@@ -17,4 +17,32 @@ return [
 
     /** Seconds to cache match-sorted relevant candidate ID lists per job. */
     'job_relevant_sort_cache_ttl' => max(60, (int) env('HIREVO_JOB_RELEVANT_SORT_CACHE_TTL', 300)),
+
+    /**
+     * Indian metros for recruiter job ↔ candidate location ranking (aliases roll up to label).
+     *
+     * @var list<array{label: string, aliases: list<string>}>
+     */
+    'main_cities' => [
+        ['label' => 'Mumbai', 'aliases' => ['mumbai']],
+        ['label' => 'Delhi NCR', 'aliases' => ['delhi', 'new delhi', 'delhi ncr', 'ncr', 'gurgaon', 'gurugram', 'noida', 'faridabad', 'ghaziabad', 'greater noida']],
+        ['label' => 'Bangalore', 'aliases' => ['bangalore', 'bengaluru']],
+        ['label' => 'Hyderabad', 'aliases' => ['hyderabad', 'secunderabad']],
+        ['label' => 'Chennai', 'aliases' => ['chennai', 'madras']],
+        ['label' => 'Pune', 'aliases' => ['pune', 'pimpri', 'chinchwad']],
+        ['label' => 'Kolkata', 'aliases' => ['kolkata', 'calcutta']],
+        ['label' => 'Ahmedabad', 'aliases' => ['ahmedabad']],
+        ['label' => 'Jaipur', 'aliases' => ['jaipur']],
+        ['label' => 'Chandigarh', 'aliases' => ['chandigarh', 'mohali', 'panchkula']],
+        ['label' => 'Indore', 'aliases' => ['indore']],
+        ['label' => 'Kochi', 'aliases' => ['kochi', 'cochin', 'ernakulam']],
+        ['label' => 'Coimbatore', 'aliases' => ['coimbatore']],
+        ['label' => 'Lucknow', 'aliases' => ['lucknow']],
+        ['label' => 'Nagpur', 'aliases' => ['nagpur']],
+        ['label' => 'Surat', 'aliases' => ['surat']],
+        ['label' => 'Vadodara', 'aliases' => ['vadodara', 'baroda']],
+        ['label' => 'Bhubaneswar', 'aliases' => ['bhubaneswar', 'bhubaneshwar']],
+        ['label' => 'Visakhapatnam', 'aliases' => ['visakhapatnam', 'vizag']],
+        ['label' => 'Thiruvananthapuram', 'aliases' => ['thiruvananthapuram', 'trivandrum']],
+    ],
 ];

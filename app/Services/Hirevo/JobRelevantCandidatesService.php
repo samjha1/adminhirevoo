@@ -15,6 +15,7 @@ class JobRelevantCandidatesService
     public function __construct(
         private readonly CandidateSectorService $sectors,
         private readonly JobMatchScoreService $matchScore,
+        private readonly JobLocationMatchService $locationMatch,
     ) {
     }
 
@@ -64,7 +65,7 @@ class JobRelevantCandidatesService
         }
 
         $stamp = $job->updated_at?->getTimestamp() ?? 0;
-        $cacheKey = 'portal.job.'.$job->id.'.sorted_ids.'.$stamp.'.'.md5(implode(',', $ids));
+        $cacheKey = 'portal.job.'.$job->id.'.sorted_ids.loc.v1.'.$stamp.'.'.md5(implode(',', $ids));
 
         return Cache::remember(
             $cacheKey,
@@ -83,18 +84,30 @@ class JobRelevantCandidatesService
 
                     foreach ($users as $user) {
                         $resume = $user->resumes->first();
+                        $profile = $user->candidateProfile;
                         $scored[] = [
                             'id' => (int) $user->id,
+                            'location_rank' => $this->locationMatch->jobLocationSortRank($job, $profile),
                             'score' => $this->matchScore->scoreResumeAgainstJob(
                                 $resume,
                                 $job,
-                                is_string($user->candidateProfile?->skills) ? $user->candidateProfile->skills : null,
+                                is_string($profile?->skills) ? $profile->skills : null,
                             ),
                         ];
                     }
                 }
 
-                usort($scored, fn (array $a, array $b) => $b['score'] <=> $a['score'] ?: $b['id'] <=> $a['id']);
+                usort($scored, function (array $a, array $b) {
+                    if ($a['location_rank'] !== $b['location_rank']) {
+                        return $a['location_rank'] <=> $b['location_rank'];
+                    }
+
+                    if ($a['score'] !== $b['score']) {
+                        return $b['score'] <=> $a['score'];
+                    }
+
+                    return $b['id'] <=> $a['id'];
+                });
 
                 return array_column($scored, 'id');
             },
@@ -226,9 +239,15 @@ class JobRelevantCandidatesService
                 'candidateProfile',
                 'resumes' => fn ($q) => $q->orderByDesc('is_primary')->orderByDesc('created_at')->limit(1),
             ])
-            ->orderByDesc('created_at')
             ->paginate($perPage, ['*'], 'candidates_page', $page)
             ->withQueryString();
+
+        $sorted = $this->locationMatch->sortCandidatesByLocationThenScore(
+            $paginator->getCollection(),
+            $job,
+            $this->matchScore,
+        );
+        $paginator->setCollection($sorted);
 
         $this->attachCandidateMetrics($paginator->getCollection(), $job);
 
@@ -242,12 +261,15 @@ class JobRelevantCandidatesService
     {
         $candidates->transform(function (HirevoUser $candidate) use ($job) {
             $resume = $candidate->resumes?->first();
+            $profile = $candidate->candidateProfile;
             $candidate->setAttribute('has_resume', $resume !== null);
             $candidate->setAttribute('profile_match_percent', $this->matchScore->scoreResumeAgainstJob(
                 $resume,
                 $job,
-                is_string($candidate->candidateProfile?->skills) ? $candidate->candidateProfile->skills : null,
+                is_string($profile?->skills) ? $profile->skills : null,
             ));
+            $candidate->setAttribute('location_label', $this->locationMatch->candidateLocationLabel($profile));
+            $candidate->setAttribute('location_matches_job', $this->locationMatch->candidateMatchesJob($job, $profile));
 
             return $candidate;
         });

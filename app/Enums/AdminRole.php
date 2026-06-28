@@ -11,6 +11,7 @@ enum AdminRole: string
     case SalesManager = 'sales_manager';
     case SalesEmployee = 'sales_employee';
     case Recruiter = 'recruiter';
+    case RecruiterManager = 'recruiter_manager';
 
     public function label(): string
     {
@@ -22,6 +23,7 @@ enum AdminRole: string
             self::SalesManager => 'Sales Manager',
             self::SalesEmployee => 'Sales Employee',
             self::Recruiter => 'Recruiter',
+            self::RecruiterManager => 'Recruiter Manager',
         };
     }
 
@@ -38,6 +40,16 @@ enum AdminRole: string
     public function isPlatformAdmin(): bool
     {
         return $this === self::SuperAdmin || $this === self::Admin;
+    }
+
+    public function isRecruiterManager(): bool
+    {
+        return $this === self::RecruiterManager;
+    }
+
+    public function isPortalStaff(): bool
+    {
+        return $this === self::Recruiter || $this === self::RecruiterManager;
     }
 
     public function isSalesFieldRole(): bool

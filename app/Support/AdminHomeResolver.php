@@ -19,6 +19,10 @@ final class AdminHomeResolver
             return 'admin.dashboard';
         }
 
+        if ($admin->role === \App\Enums\AdminRole::RecruiterManager) {
+            return 'admin.portal.recruiter-assignments.index';
+        }
+
         if ($resolver->can($admin, 'portal.dashboard.view')) {
             return 'admin.portal.dashboard';
         }
@@ -79,6 +83,13 @@ final class AdminHomeResolver
             '/staff' => ['staff.view', 'staff.manage'],
             '/settings/audit-logs' => ['audit.view'],
             '/settings/roles' => ['rbac.manage_permissions'],
+            '/portal/recruiter-assignments' => ['portal.recruiter_assignments.manage'],
+            '/portal/recruiter-activity' => ['portal.recruiter_activity.view'],
+            '/portal/my-activity' => ['portal.applications.view'],
+            '/jobs' => ['portal.jobs.view', 'platform.jobs'],
+            '/employers' => ['portal.companies.view', 'platform.employers'],
+            '/portal/applications' => ['portal.applications.view'],
+            '/candidates' => ['portal.candidates.view', 'portal.candidates.profile'],
             '/reports' => ['portal.reports.view'],
             '/leads' => ['leads.view'],
             '/pipelines/companies' => ['leads.view'],

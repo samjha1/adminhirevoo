@@ -214,6 +214,7 @@
                                     </th>
                                 @endif
                                 <th>Candidate</th>
+                                <th>Location</th>
                                 <th>Contact</th>
                                 <th>Experience</th>
                                 <th>Match</th>
@@ -247,6 +248,12 @@
                                             </a>
                                         </div>
                                         <div class="small text-muted">{{ $cProfile?->headline ?? '—' }}</div>
+                                    </td>
+                                    <td class="small">
+                                        {{ $candidate->location_label ?? ($cProfile?->preferred_job_location ?? $cProfile?->location ?? '—') }}
+                                        @if($candidate->location_matches_job ?? false)
+                                            <span class="badge rounded-pill bg-success-subtle text-success ms-1">Same city</span>
+                                        @endif
                                     </td>
                                     <td class="small">
                                         <div>{{ $candidate->email }}</div>

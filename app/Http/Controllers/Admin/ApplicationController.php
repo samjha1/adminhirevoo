@@ -9,6 +9,7 @@ use App\Models\Hirevo\HirevoResume;
 use App\Models\Hirevo\HirevoUser;
 use App\Services\AuditLogService;
 use App\Services\Hirevo\JobMatchScoreService;
+use App\Services\Portal\PortalRecruiterScopeService;
 use App\Support\PortalDateFilter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,19 +21,22 @@ class ApplicationController extends Controller
     public function __construct(
         private readonly AuditLogService $audit,
         private readonly JobMatchScoreService $matchScore,
+        private readonly PortalRecruiterScopeService $recruiterScope,
     ) {
     }
 
     public function index(Request $request): View
     {
+        $admin = auth('admin')->user();
         $dateFilter = PortalDateFilter::fromRequest($request);
         $sort = $request->query('sort', 'created_at');
         $direction = $request->query('dir', 'desc') === 'asc' ? 'asc' : 'desc';
 
         $query = HirevoEmployerJobApplication::query()
-            ->with(['candidate.resumes', 'job.employer.referrerProfile'])
+            ->with(['candidate.resumes', 'job.employer.referrerProfile', 'appliedByAdmin'])
             ->orderBy($sort, $direction);
 
+        $this->recruiterScope->scopeApplicationsQuery($query, $admin);
         $dateFilter->apply($query);
 
         if ($request->filled('status')) {
@@ -73,11 +77,12 @@ class ApplicationController extends Controller
         }
 
         $now = now();
+        $statsQuery = fn () => $this->recruiterScope->scopeApplicationsQuery(HirevoEmployerJobApplication::query(), $admin);
         $stats = [
-            'total' => HirevoEmployerJobApplication::query()->count(),
-            'today' => HirevoEmployerJobApplication::query()->where('created_at', '>=', $now->copy()->startOfDay())->count(),
-            'weekly' => HirevoEmployerJobApplication::query()->where('created_at', '>=', $now->copy()->startOfWeek())->count(),
-            'monthly' => HirevoEmployerJobApplication::query()->where('created_at', '>=', $now->copy()->startOfMonth())->count(),
+            'total' => (clone $statsQuery())->count(),
+            'today' => (clone $statsQuery())->where('created_at', '>=', $now->copy()->startOfDay())->count(),
+            'weekly' => (clone $statsQuery())->where('created_at', '>=', $now->copy()->startOfWeek())->count(),
+            'monthly' => (clone $statsQuery())->where('created_at', '>=', $now->copy()->startOfMonth())->count(),
         ];
 
         $applications = $query->paginate(15)->withQueryString();
@@ -89,17 +94,20 @@ class ApplicationController extends Controller
             return $application;
         });
 
-        $filterCompanies = HirevoUser::query()
+        $filterCompaniesQuery = HirevoUser::query()
             ->where('role', 'referrer')
             ->whereHas('referrerProfile')
             ->orderBy('name')
-            ->limit(100)
-            ->get(['id', 'name']);
+            ->limit(100);
 
-        $filterJobs = HirevoEmployerJob::query()
+        $this->recruiterScope->scopeEmployersQuery($filterCompaniesQuery, $admin);
+        $filterCompanies = $filterCompaniesQuery->get(['id', 'name']);
+
+        $filterJobsQuery = HirevoEmployerJob::query()
             ->orderByDesc('created_at')
-            ->limit(100)
-            ->get(['id', 'title']);
+            ->limit(100);
+        $this->recruiterScope->scopeJobsQuery($filterJobsQuery, $admin);
+        $filterJobs = $filterJobsQuery->get(['id', 'title']);
 
         $filterCandidates = HirevoUser::query()
             ->where('role', 'candidate')
@@ -125,7 +133,13 @@ class ApplicationController extends Controller
             'candidate.candidateProfile',
             'candidate.resumes',
             'job.employer.referrerProfile',
+            'appliedByAdmin',
         ]);
+
+        $this->recruiterScope->assertCanAccessJob(
+            auth('admin')->user(),
+            $application->job ?? abort(404),
+        );
 
         $resume = $this->primaryResumeFor($application);
         $application->setAttribute('ai_resume_summary', (string) ($resume?->ai_summary ?? ''));
@@ -138,6 +152,12 @@ class ApplicationController extends Controller
 
     public function updateStatus(Request $request, HirevoEmployerJobApplication $application): RedirectResponse
     {
+        $application->loadMissing('job');
+        $this->recruiterScope->assertCanAccessJob(
+            auth('admin')->user(),
+            $application->job ?? abort(404),
+        );
+
         $validated = $request->validate([
             'status' => ['required', Rule::in([
                 'applied', 'shortlisted', 'interviewed', 'offered', 'hired', 'rejected', 'qualified',

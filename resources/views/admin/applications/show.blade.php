@@ -305,6 +305,12 @@
                             <span class="app-detail-chip">
                                 <i class="bi bi-stars"></i> {{ $matchPercent }}% match
                             </span>
+                            @if($application->applied_by_admin_id && $application->appliedByAdmin)
+                                <span class="app-detail-chip">
+                                    <i class="bi bi-person-check"></i>
+                                    Applied by {{ $application->appliedByAdmin->name }}
+                                </span>
+                            @endif
                         </div>
                     </div>
                 </div>

@@ -8,7 +8,7 @@
     @php
         $stats = $stats ?? [];
         $dateFilter = $dateFilter ?? \App\Support\PortalDateFilter::fromRequest(request());
-        $hasFilters = request()->filled('q') || request()->filled('status') || $dateFilter->isActive();
+        $hasFilters = request()->filled('q') || request()->filled('status') || request()->filled('company_id') || $dateFilter->isActive();
     @endphp
 
     <div class="portal-page">
@@ -37,6 +37,13 @@
         @endif
         @if(session('warning'))
             <div class="alert alert-warning shadow-soft">{{ session('warning') }}</div>
+        @endif
+
+        @if(!empty($recruiterHasNoAssignments))
+            <div class="alert alert-info shadow-soft">
+                <i class="bi bi-info-circle me-1"></i>
+                No companies assigned yet. Ask your manager to assign employer companies before you can view jobs.
+            </div>
         @endif
 
         @include('partials.portal-mini-stats', ['items' => [
@@ -71,6 +78,19 @@
                             <option value="draft" @selected(request('status')==='draft')>Draft</option>
                         </select>
                     </div>
+                    @if(isset($filterCompanies) && $filterCompanies->isNotEmpty())
+                        <div class="col-6 col-md-4 col-lg-2">
+                            <label class="form-label">Company</label>
+                            <select name="company_id" class="form-select">
+                                <option value="">All companies</option>
+                                @foreach($filterCompanies as $co)
+                                    <option value="{{ $co->id }}" @selected((int) request('company_id') === $co->id)>
+                                        {{ \Illuminate\Support\Str::limit($co->referrerProfile?->company_name ?? $co->name, 28) }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
                     <div class="col-6 col-md-4 col-lg-2">
                         <label class="form-label">Time period</label>
                         <select name="period" class="form-select portal-period-select">
@@ -154,7 +174,11 @@
                             <td colspan="8">
                                 <div class="portal-empty">
                                     <i class="bi bi-briefcase"></i>
-                                    No jobs match your filters.
+                                    @if(!empty($recruiterHasNoAssignments))
+                                        No companies assigned yet.
+                                    @else
+                                        No jobs match your filters.
+                                    @endif
                                 </div>
                             </td>
                         </tr>
