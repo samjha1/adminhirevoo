@@ -10,9 +10,11 @@ use App\Http\Controllers\Admin\Leads\LeadController;
 use App\Http\Controllers\Admin\Leads\LeadFollowUpController;
 use App\Http\Controllers\Admin\Leads\CompanyFollowUpController;
 use App\Http\Controllers\Admin\Leads\CompanyOutreachLeadController;
+use App\Http\Controllers\Admin\Leads\CompanySalesActivityController;
 use App\Http\Controllers\Admin\Leads\EmployerPipelineController;
 use App\Http\Controllers\Admin\Leads\LeadKanbanController;
 use App\Http\Controllers\Admin\Leads\StandaloneLeadController;
+use App\Http\Controllers\Admin\Leads\TalentSalesActivityController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\EmployerPlanPaymentController;
 use App\Http\Controllers\Admin\ReferralController;
@@ -66,6 +68,10 @@ Route::middleware(['admin.guard', 'auth:admin', 'permission:audit.view'])->group
 });
 
 Route::middleware(['admin.guard', 'auth:admin', 'permission:leads.view', 'sales.pipeline:candidate'])->group(function () {
+    Route::get('/leads/my-activity', [TalentSalesActivityController::class, 'myActivity'])
+        ->name('admin.leads.activity.my');
+    Route::get('/leads/team-activity', [TalentSalesActivityController::class, 'teamActivity'])
+        ->name('admin.leads.activity.team');
     Route::get('/leads', [LeadController::class, 'index'])->name('admin.leads.index');
     Route::get('/leads/export', fn (\Illuminate\Http\Request $request, HirevoLeadExportService $export) => $export->export($request, $request->user('admin')))
         ->middleware('permission:leads.export')
@@ -165,6 +171,10 @@ Route::middleware(['admin.guard', 'auth:admin', 'permission:leads.view', 'sales.
         ->whereNumber('outreachLead')
         ->middleware('permission:leads.assign_employee')
         ->name('admin.employers.outreach.assign-employee');
+    Route::get('/pipelines/companies/my-activity', [CompanySalesActivityController::class, 'myActivity'])
+        ->name('admin.employers.activity.my');
+    Route::get('/pipelines/companies/team-activity', [CompanySalesActivityController::class, 'teamActivity'])
+        ->name('admin.employers.activity.team');
     Route::get('/pipelines/companies', [EmployerPipelineController::class, 'index'])->name('admin.employers.pipeline.index');
     Route::get('/pipelines/companies/kanban', [EmployerPipelineController::class, 'kanban'])
         ->middleware('permission:kanban.view')

@@ -74,6 +74,24 @@
                         </span>
                     </a>
                 @endif
+                <a class="sidebar-link sidebar-link--child @if(request()->routeIs('admin.employers.activity.my')) is-active @endif"
+                   href="{{ route('admin.employers.activity.my') }}">
+                    <span class="sidebar-link-icon"><i class="bi bi-person-check"></i></span>
+                    <span class="sidebar-link-text">
+                        <span class="sidebar-link-label">My activity</span>
+                        <span class="sidebar-link-sub">Today's work</span>
+                    </span>
+                </a>
+                @if(app(\App\Services\SalesTeamActivityScopeService::class)->canViewTeamActivity($admin))
+                    <a class="sidebar-link sidebar-link--child @if(request()->routeIs('admin.employers.activity.team')) is-active @endif"
+                       href="{{ route('admin.employers.activity.team') }}">
+                        <span class="sidebar-link-icon"><i class="bi bi-people"></i></span>
+                        <span class="sidebar-link-text">
+                            <span class="sidebar-link-label">Team activity</span>
+                            <span class="sidebar-link-sub">Staff reports</span>
+                        </span>
+                    </a>
+                @endif
                 @if($can('employer_payments.view'))
                     <a class="sidebar-link sidebar-link--child @if(request()->routeIs('admin.employer-plan-payments.*')) is-active @endif"
                        href="{{ route('admin.employer-plan-payments.index') }}">
@@ -122,6 +140,24 @@
                         <span class="sidebar-link-text">
                             <span class="sidebar-link-label">Follow-ups</span>
                             <span class="sidebar-link-sub">Today's tasks</span>
+                        </span>
+                    </a>
+                @endif
+                <a class="sidebar-link sidebar-link--child @if(request()->routeIs('admin.leads.activity.my')) is-active @endif"
+                   href="{{ route('admin.leads.activity.my') }}">
+                    <span class="sidebar-link-icon"><i class="bi bi-person-check"></i></span>
+                    <span class="sidebar-link-text">
+                        <span class="sidebar-link-label">My activity</span>
+                        <span class="sidebar-link-sub">Today's work</span>
+                    </span>
+                </a>
+                @if(app(\App\Services\SalesTeamActivityScopeService::class)->canViewTeamActivity($admin))
+                    <a class="sidebar-link sidebar-link--child @if(request()->routeIs('admin.leads.activity.team')) is-active @endif"
+                       href="{{ route('admin.leads.activity.team') }}">
+                        <span class="sidebar-link-icon"><i class="bi bi-people"></i></span>
+                        <span class="sidebar-link-text">
+                            <span class="sidebar-link-label">Team activity</span>
+                            <span class="sidebar-link-sub">Staff reports</span>
                         </span>
                     </a>
                 @endif

@@ -33,6 +33,11 @@ class CrmLeadActivity extends Model
         return $this->belongsTo(Admin::class);
     }
 
+    public function lead(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Hirevo\HirevoLead::class, 'lead_id');
+    }
+
     public function source(): MorphTo
     {
         return $this->morphTo();

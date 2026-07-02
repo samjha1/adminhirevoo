@@ -1,5 +1,7 @@
 @php
     $activeTab = $activeTab ?? (request()->routeIs('admin.employers.outreach.*') ? 'outreach' : 'pipeline');
+    $admin = auth('admin')->user();
+    $canViewTeamActivity = app(\App\Services\SalesTeamActivityScopeService::class)->canViewTeamActivity($admin);
 @endphp
 @once
 @push('styles')
@@ -36,4 +38,18 @@
         <i class="bi bi-person-plus me-1"></i>Outreach leads
         <span class="text-muted small ms-1">(not signed up)</span>
     </a>
+    <a href="{{ route('admin.employers.activity.my') }}"
+       class="company-section-tab @if($activeTab === 'my-activity') active @endif"
+       role="tab"
+       @if($activeTab === 'my-activity') aria-selected="true" @endif>
+        <i class="bi bi-person-check me-1"></i>My activity
+    </a>
+    @if($canViewTeamActivity)
+        <a href="{{ route('admin.employers.activity.team') }}"
+           class="company-section-tab @if($activeTab === 'team-activity') active @endif"
+           role="tab"
+           @if($activeTab === 'team-activity') aria-selected="true" @endif>
+            <i class="bi bi-people me-1"></i>Team activity
+        </a>
+    @endif
 </div>

@@ -23,4 +23,9 @@ class CrmCompanyActivity extends Model
     {
         return $this->belongsTo(Admin::class);
     }
+
+    public function employerProspect(): BelongsTo
+    {
+        return $this->belongsTo(CrmEmployerProspect::class, 'employer_prospect_id');
+    }
 }

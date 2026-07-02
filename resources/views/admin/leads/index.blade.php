@@ -210,6 +210,7 @@
     <div class="leads-page">
         @isset($pipeline)
             @include('partials.crm-pipeline-chrome', ['pipeline' => $pipeline])
+            @include('partials.talent-section-tabs', ['activeTab' => 'pipeline'])
         @else
             <div class="page-header flex-wrap mb-3">
                 <div>
