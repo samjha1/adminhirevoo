@@ -18,10 +18,15 @@
             </thead>
             <tbody>
                 @forelse($activities as $item)
+                    @php
+                        $at = $item['at'] instanceof \Carbon\CarbonInterface
+                            ? $item['at']
+                            : \Carbon\Carbon::parse($item['at']);
+                    @endphp
                     <tr>
                         <td class="text-nowrap">
-                            <div class="fw-semibold">{{ $item['at']->format('M j, Y') }}</div>
-                            <div class="small text-muted">{{ $item['at']->format('g:i A') }}</div>
+                            <div class="fw-semibold">{{ $at->format('M j, Y') }}</div>
+                            <div class="small text-muted">{{ $at->format('g:i A') }}</div>
                         </td>
                         @if($showStaffColumn)
                             <td>
@@ -58,9 +63,7 @@
         </table>
     </div>
 
-    @if($activities->hasPages())
-        <div class="p-3 border-top">
-            {{ $activities->links() }}
-        </div>
+    @if($activities->hasPages() || $activities->total() > 0)
+        @include('partials.crm-pagination-footer', ['paginator' => $activities])
     @endif
 </div>

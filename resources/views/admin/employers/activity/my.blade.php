@@ -3,6 +3,7 @@
 @section('title', 'My activity')
 
 @push('styles')
+@include('admin.employers.activity.partials.styles')
 <style>
     .company-activity-table-wrap {
         border: 1px solid rgba(15, 23, 42, .08);

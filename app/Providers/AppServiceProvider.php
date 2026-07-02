@@ -6,6 +6,7 @@ use App\Models\Hirevo\HirevoLead;
 use App\Models\Leadsmanager\LeadsmanagerAd;
 use App\Policies\LeadPolicy;
 use App\Services\EmployerPlanPaymentVisibilityService;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\View;
@@ -27,6 +28,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Paginator::useBootstrapFive();
+
         Gate::policy(HirevoLead::class, LeadPolicy::class);
 
         View::composer('partials.admin-sidebar-nav', function ($view) {
